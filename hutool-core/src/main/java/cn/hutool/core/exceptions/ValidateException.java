@@ -4,7 +4,7 @@ import cn.hutool.core.util.StrUtil;
 
 /**
  * 验证异常
- * 
+ *
  * @author xiaoleilu
  */
 public class ValidateException extends StatefulException {
@@ -16,7 +16,7 @@ public class ValidateException extends StatefulException {
 	public ValidateException(String msg) {
 		super(msg);
 	}
-	
+
 	public ValidateException(String messageTemplate, Object... params) {
 		super(StrUtil.format(messageTemplate, params));
 	}
@@ -35,6 +35,10 @@ public class ValidateException extends StatefulException {
 
 	public ValidateException(int status, Throwable throwable) {
 		super(status, throwable);
+	}
+
+	public ValidateException(String message, Throwable throwable, boolean enableSuppression, boolean writableStackTrace) {
+		super(message, throwable, enableSuppression, writableStackTrace);
 	}
 
 	public ValidateException(int status, String msg, Throwable throwable) {

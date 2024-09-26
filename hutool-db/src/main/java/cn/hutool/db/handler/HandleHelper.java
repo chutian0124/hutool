@@ -1,16 +1,7 @@
 package cn.hutool.db.handler;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.sql.Types;
-import java.util.Collection;
-import java.util.Map;
-
-import cn.hutool.core.bean.BeanDesc.PropDesc;
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.bean.PropDesc;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.ArrayUtil;
@@ -19,9 +10,20 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.core.util.TypeUtil;
 import cn.hutool.db.Entity;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Type;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Types;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
 /**
  * 数据结果集处理辅助类
- * 
+ *
  * @author loolly
  *
  */
@@ -58,7 +60,7 @@ public class HandleHelper {
 	@SuppressWarnings("unchecked")
 	public static <T> T handleRow(int columnCount, ResultSetMetaData meta, ResultSet rs, Class<T> beanClass) throws SQLException {
 		Assert.notNull(beanClass, "Bean Class must be not null !");
-		
+
 		if(beanClass.isArray()) {
 			//返回数组
 			final Class<?> componentType = beanClass.getComponentType();
@@ -79,7 +81,7 @@ public class HandleHelper {
 			final Object[] objRow = handleRow(columnCount, meta, rs, Object[].class);
 			return (T) StrUtil.join(", ", objRow);
 		}
-		
+
 		//普通bean
 		final T bean = ReflectUtil.newInstanceIfPossible(beanClass);
 		//忽略字段大小写
@@ -97,8 +99,8 @@ public class HandleHelper {
 			}
 			setter = (null == pd) ? null : pd.getSetter();
 			if(null != setter) {
-				value = getColumnValue(rs, columnLabel,  meta.getColumnType(i), TypeUtil.getFirstParamType(setter));
-				ReflectUtil.invokeWithCheck(bean, setter, new Object[] {value});
+				value = getColumnValue(rs, i,  meta.getColumnType(i), TypeUtil.getFirstParamType(setter));
+				ReflectUtil.invokeWithCheck(bean, setter, value);
 			}
 		}
 		return bean;
@@ -106,7 +108,7 @@ public class HandleHelper {
 
 	/**
 	 * 处理单条数据
-	 * 
+	 *
 	 * @param columnCount 列数
 	 * @param meta ResultSetMetaData
 	 * @param rs 数据集
@@ -116,10 +118,10 @@ public class HandleHelper {
 	public static Entity handleRow(int columnCount, ResultSetMetaData meta, ResultSet rs) throws SQLException {
 		return handleRow(columnCount, meta, rs, false);
 	}
-	
+
 	/**
 	 * 处理单条数据
-	 * 
+	 *
 	 * @param columnCount 列数
 	 * @param meta ResultSetMetaData
 	 * @param rs 数据集
@@ -134,7 +136,7 @@ public class HandleHelper {
 
 	/**
 	 * 处理单条数据
-	 * 
+	 *
 	 * @param <T> Entity及其子对象
 	 * @param row Entity对象
 	 * @param columnCount 列数
@@ -146,15 +148,25 @@ public class HandleHelper {
 	 * @since 3.3.1
 	 */
 	public static <T extends Entity> T handleRow(T row, int columnCount, ResultSetMetaData meta, ResultSet rs, boolean withMetaInfo) throws SQLException {
-		String columnLabel;
 		int type;
+		String columnLabel;
 		for (int i = 1; i <= columnCount; i++) {
-			columnLabel = meta.getColumnLabel(i);
 			type = meta.getColumnType(i);
-			row.put(columnLabel, getColumnValue(rs, columnLabel, type, null));
+			columnLabel = meta.getColumnLabel(i);
+			if("rownum_".equalsIgnoreCase(columnLabel)){
+				// issue#2618@Github
+				// 分页时会查出rownum字段，此处忽略掉读取
+				continue;
+			}
+			row.put(columnLabel, getColumnValue(rs, i, type, null));
 		}
 		if (withMetaInfo) {
-			row.setTableName(meta.getTableName(1));
+			try {
+				row.setTableName(meta.getTableName(1));
+			} catch (SQLException ignore){
+				//issue#I2AGLU@Gitee
+				// Hive等NoSQL中无表的概念，此处报错，跳过。
+			}
 			row.setFieldNames(row.keySet());
 		}
 		return row;
@@ -162,7 +174,7 @@ public class HandleHelper {
 
 	/**
 	 * 处理单条数据
-	 * 
+	 *
 	 * @param rs 数据集
 	 * @return 每一行的Entity
 	 * @throws SQLException SQL执行异常
@@ -174,8 +186,27 @@ public class HandleHelper {
 	}
 
 	/**
+	 * 处理单行数据
+	 *
+	 * @param rs 数据集（行）
+	 * @return 每一行的List
+	 * @throws SQLException SQL执行异常
+	 * @since 5.1.6
+	 */
+	public static List<Object> handleRowToList(ResultSet rs) throws SQLException {
+		final ResultSetMetaData meta = rs.getMetaData();
+		final int columnCount = meta.getColumnCount();
+		final List<Object> row = new ArrayList<>(columnCount);
+		for (int i = 1; i <= columnCount; i++) {
+			row.add(getColumnValue(rs, i, meta.getColumnType(i), null));
+		}
+
+		return row;
+	}
+
+	/**
 	 * 处理多条数据
-	 * 
+	 *
 	 * @param <T> 集合类型
 	 * @param rs 数据集
 	 * @param collection 数据集
@@ -185,10 +216,10 @@ public class HandleHelper {
 	public static <T extends Collection<Entity>> T handleRs(ResultSet rs, T collection) throws SQLException {
 		return handleRs(rs, collection, false);
 	}
-	
+
 	/**
 	 * 处理多条数据
-	 * 
+	 *
 	 * @param <T> 集合类型
 	 * @param rs 数据集
 	 * @param collection 数据集
@@ -210,7 +241,7 @@ public class HandleHelper {
 
 	/**
 	 * 处理多条数据并返回一个Bean列表
-	 * 
+	 *
 	 * @param <E> 集合元素类型
 	 * @param <T> 集合类型
 	 * @param rs 数据集
@@ -235,41 +266,7 @@ public class HandleHelper {
 	/**
 	 * 获取字段值<br>
 	 * 针对日期时间等做单独处理判断
-	 * 
-	 * @param <T> 返回类型
-	 * @param rs {@link ResultSet}
-	 * @param label 字段标签或者字段名
-	 * @param type 字段类型，默认Object
-	 * @param targetColumnType 结果要求的类型，需进行二次转换（null或者Object不转换）
-	 * @return 字段值
-	 * @throws SQLException SQL异常
-	 */
-	private static <T> Object getColumnValue(ResultSet rs, String label, int type, Type targetColumnType) throws SQLException {
-		Object rawValue;
-		switch (type) {
-		case Types.TIMESTAMP:
-			rawValue = rs.getTimestamp(label);
-			break;
-		case Types.TIME:
-			rawValue = rs.getTime(label);
-			break;
-		default:
-			rawValue = rs.getObject(label);
-		}
-		if (null == targetColumnType || Object.class == targetColumnType) {
-			// 无需转换
-			return rawValue;
-		} else {
-			// 按照返回值要求转换
-			return Convert.convert(targetColumnType, rawValue);
-		}
-	}
-
-	/**
-	 * 获取字段值<br>
-	 * 针对日期时间等做单独处理判断
-	 * 
-	 * @param <T> 返回类型
+	 *
 	 * @param rs {@link ResultSet}
 	 * @param columnIndex 字段索引
 	 * @param type 字段类型，默认Object
@@ -277,11 +274,16 @@ public class HandleHelper {
 	 * @return 字段值
 	 * @throws SQLException SQL异常
 	 */
-	private static <T> Object getColumnValue(ResultSet rs, int columnIndex, int type, Type targetColumnType) throws SQLException {
-		Object rawValue;
+	private static Object getColumnValue(ResultSet rs, int columnIndex, int type, Type targetColumnType) throws SQLException {
+		Object rawValue = null;
 		switch (type) {
 		case Types.TIMESTAMP:
-			rawValue = rs.getTimestamp(columnIndex);
+			try{
+				rawValue = rs.getTimestamp(columnIndex);
+			} catch (SQLException ignore){
+				// issue#776@Github
+				// 当数据库中日期为0000-00-00 00:00:00报错，转为null
+			}
 			break;
 		case Types.TIME:
 			rawValue = rs.getTime(columnIndex);

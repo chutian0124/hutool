@@ -1,13 +1,13 @@
 package cn.hutool.core.lang;
 
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.map.MapUtil;
+import cn.hutool.core.util.RandomUtil;
+
 import java.io.Serializable;
 import java.util.Random;
 import java.util.SortedMap;
 import java.util.TreeMap;
-
-import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.map.MapUtil;
-import cn.hutool.core.util.RandomUtil;
 
 /**
  * 权重随机算法实现<br>
@@ -19,11 +19,11 @@ import cn.hutool.core.util.RandomUtil;
  * </p>
  * 总体思路：累加每个元素的权重A(1)-B(3)-C(6)-D(10)，则4个元素的的权重管辖区间分别为[0,1)、[1,3)、[3,6)、[6,10)。<br>
  * 然后随机出一个[0,10)之间的随机数。落在哪个区间，则该区间之后的元素即为按权重命中的元素。<br>
- * 
+ *
  * <p>
  * 参考博客：https://www.cnblogs.com/waterystone/p/5708063.html
  * <p>
- * 
+ *
  * @param <T> 权重随机获取的对象类型
  * @author looly
  * @since 3.3.0
@@ -31,8 +31,8 @@ import cn.hutool.core.util.RandomUtil;
 public class WeightRandom<T> implements Serializable {
 	private static final long serialVersionUID = -8244697995702786499L;
 
-	private TreeMap<Double, T> weightMap;
-	private Random random;
+	private final TreeMap<Double, T> weightMap;
+
 
 	/**
 	 * 创建权重随机获取器
@@ -50,12 +50,12 @@ public class WeightRandom<T> implements Serializable {
 	 */
 	public WeightRandom() {
 		weightMap = new TreeMap<>();
-		random = RandomUtil.getRandom();
+
 	}
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param weightObj 带有权重的对象
 	 */
 	public WeightRandom(WeightObj<T> weightObj) {
@@ -67,7 +67,7 @@ public class WeightRandom<T> implements Serializable {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param weightObjs 带有权重的对象
 	 */
 	public WeightRandom(Iterable<WeightObj<T>> weightObjs) {
@@ -81,7 +81,7 @@ public class WeightRandom<T> implements Serializable {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param weightObjs 带有权重的对象
 	 */
 	public WeightRandom(WeightObj<T>[] weightObjs) {
@@ -94,7 +94,7 @@ public class WeightRandom<T> implements Serializable {
 
 	/**
 	 * 增加对象
-	 * 
+	 *
 	 * @param obj 对象
 	 * @param weight 权重
 	 * @return this
@@ -105,7 +105,7 @@ public class WeightRandom<T> implements Serializable {
 
 	/**
 	 * 增加对象权重
-	 * 
+	 *
 	 * @param weightObj 权重对象
 	 * @return this
 	 */
@@ -122,7 +122,7 @@ public class WeightRandom<T> implements Serializable {
 
 	/**
 	 * 清空权重表
-	 * 
+	 *
 	 * @return this
 	 */
 	public WeightRandom<T> clear() {
@@ -134,13 +134,14 @@ public class WeightRandom<T> implements Serializable {
 
 	/**
 	 * 下一个随机对象
-	 * 
+	 *
 	 * @return 随机对象
 	 */
 	public T next() {
 		if(MapUtil.isEmpty(this.weightMap)) {
 			return null;
 		}
+		final Random random = RandomUtil.getRandom();
 		final double randomWeight = this.weightMap.lastKey() * random.nextDouble();
 		final SortedMap<Double, T> tailMap = this.weightMap.tailMap(randomWeight, false);
 		return this.weightMap.get(tailMap.firstKey());
@@ -148,7 +149,7 @@ public class WeightRandom<T> implements Serializable {
 
 	/**
 	 * 带有权重的对象包装
-	 * 
+	 *
 	 * @author looly
 	 *
 	 * @param <T> 对象类型
@@ -157,11 +158,11 @@ public class WeightRandom<T> implements Serializable {
 		/** 对象 */
 		private T obj;
 		/** 权重 */
-		private double weight;
+		private final double weight;
 
 		/**
 		 * 构造
-		 * 
+		 *
 		 * @param obj 对象
 		 * @param weight 权重
 		 */
@@ -172,7 +173,7 @@ public class WeightRandom<T> implements Serializable {
 
 		/**
 		 * 获取对象
-		 * 
+		 *
 		 * @return 对象
 		 */
 		public T getObj() {
@@ -181,7 +182,7 @@ public class WeightRandom<T> implements Serializable {
 
 		/**
 		 * 设置对象
-		 * 
+		 *
 		 * @param obj 对象
 		 */
 		public void setObj(T obj) {
@@ -190,7 +191,7 @@ public class WeightRandom<T> implements Serializable {
 
 		/**
 		 * 获取权重
-		 * 
+		 *
 		 * @return 权重
 		 */
 		public double getWeight() {
@@ -230,5 +231,5 @@ public class WeightRandom<T> implements Serializable {
 			return Double.doubleToLongBits(weight) == Double.doubleToLongBits(other.weight);
 		}
 	}
-	
+
 }

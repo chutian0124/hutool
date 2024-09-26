@@ -1,9 +1,11 @@
 package cn.hutool.json;
 
+import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.util.StrUtil;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
 
@@ -38,7 +40,12 @@ public class JSONTokener {
 	/**
 	 * 源
 	 */
-	private Reader reader;
+	private final Reader reader;
+
+	/**
+	 * JSON配置
+	 */
+	private final JSONConfig config;
 
 	// ------------------------------------------------------------------------------------ Constructor start
 
@@ -46,8 +53,9 @@ public class JSONTokener {
 	 * 从Reader中构建
 	 *
 	 * @param reader Reader
+	 * @param config JSON配置
 	 */
-	public JSONTokener(Reader reader) {
+	public JSONTokener(Reader reader, JSONConfig config) {
 		this.reader = reader.markSupported() ? reader : new BufferedReader(reader);
 		this.eof = false;
 		this.usePrevious = false;
@@ -55,24 +63,27 @@ public class JSONTokener {
 		this.index = 0;
 		this.character = 1;
 		this.line = 1;
+		this.config = config;
 	}
 
 	/**
-	 * 从InputStream中构建
+	 * 从InputStream中构建，使用UTF-8编码
 	 *
 	 * @param inputStream InputStream
+	 * @param config      JSON配置
 	 */
-	public JSONTokener(InputStream inputStream) throws JSONException {
-		this(new InputStreamReader(inputStream));
+	public JSONTokener(InputStream inputStream, JSONConfig config) throws JSONException {
+		this(IoUtil.getUtf8Reader(inputStream), config);
 	}
 
 	/**
 	 * 从字符串中构建
 	 *
-	 * @param s JSON字符串
+	 * @param s      JSON字符串
+	 * @param config JSON配置
 	 */
-	public JSONTokener(String s) {
-		this(new StringReader(s));
+	public JSONTokener(CharSequence s, JSONConfig config) {
+		this(new StringReader(StrUtil.str(s)), config);
 	}
 	// ------------------------------------------------------------------------------------ Constructor end
 
@@ -148,6 +159,15 @@ public class JSONTokener {
 	}
 
 	/**
+	 * Get the last character read from the input or '\0' if nothing has been read yet.
+	 *
+	 * @return the last character read from the input.
+	 */
+	protected char getPrevious() {
+		return this.previous;
+	}
+
+	/**
 	 * 读取下一个字符，并比对是否和指定字符匹配
 	 *
 	 * @param c 被匹配的字符
@@ -206,7 +226,7 @@ public class JSONTokener {
 	 * 返回当前位置到指定引号前的所有字符，反斜杠的转义符也会被处理。<br>
 	 * 标准的JSON是不允许使用单引号包含字符串的，但是此实现允许。
 	 *
-	 * @param quote 字符引号, 包括 <code>"</code>（双引号） 或 <code>'</code>（单引号）。
+	 * @param quote 字符引号, 包括 {@code "}（双引号） 或 {@code '}（单引号）。
 	 * @return 截止到引号前的字符串
 	 * @throws JSONException 出现无结束的字符串时抛出此异常
 	 */
@@ -303,6 +323,43 @@ public class JSONTokener {
 	}
 
 	/**
+	 * 获取下一个String格式的值，用户获取key
+	 * @return String格式的值
+	 * @since 5.8.22
+	 */
+	public String nextStringValue(){
+		char c = this.nextClean();
+
+		switch (c) {
+			case '"':
+			case '\'':
+				return this.nextString(c);
+			case '{':
+			case '[':
+				throw this.syntaxError("Sting value must be not begin with a '{' or '['");
+		}
+
+		/*
+		 * Handle unquoted text. This could be the values true, false, or null, or it can be a number.
+		 * An implementation (such as this one) is allowed to also accept non-standard forms. Accumulate
+		 * characters until we reach the end of the text or a formatting character.
+		 */
+
+		final StringBuilder sb = new StringBuilder();
+		while (c >= ' ' && ",:]}/\\\"[{;=#".indexOf(c) < 0) {
+			sb.append(c);
+			c = this.next();
+		}
+		this.back();
+
+		final String string = sb.toString().trim();
+		if (string.isEmpty()) {
+			throw this.syntaxError("Missing value");
+		}
+		return string;
+	}
+
+	/**
 	 * 获得下一个值，值类型可以是Boolean, Double, Integer, JSONArray, JSONObject, Long, or String, or the JSONObject.NULL
 	 *
 	 * @return Boolean, Double, Integer, JSONArray, JSONObject, Long, or String, or the JSONObject.NULL
@@ -318,10 +375,18 @@ public class JSONTokener {
 				return this.nextString(c);
 			case '{':
 				this.back();
-				return new JSONObject(this);
+				try {
+					return new JSONObject(this, this.config);
+				} catch (final StackOverflowError e) {
+					throw new JSONException("JSONObject depth too large to process.", e);
+				}
 			case '[':
 				this.back();
-				return new JSONArray(this);
+				try {
+					return new JSONArray(this, this.config);
+				} catch (final StackOverflowError e) {
+					throw new JSONException("JSONArray depth too large to process.", e);
+				}
 		}
 
 		/*
@@ -330,7 +395,7 @@ public class JSONTokener {
 		 * characters until we reach the end of the text or a formatting character.
 		 */
 
-		StringBuilder sb = new StringBuilder();
+		final StringBuilder sb = new StringBuilder();
 		while (c >= ' ' && ",:]}/\\\"[{;=#".indexOf(c) < 0) {
 			sb.append(c);
 			c = this.next();
@@ -338,7 +403,7 @@ public class JSONTokener {
 		this.back();
 
 		string = sb.toString().trim();
-		if ("".equals(string)) {
+		if (string.isEmpty()) {
 			throw this.syntaxError("Missing value");
 		}
 		return InternalJSONUtil.stringToValue(string);
@@ -382,7 +447,7 @@ public class JSONTokener {
 	 * @return A JSONException object, suitable for throwing
 	 */
 	public JSONException syntaxError(String message) {
-		return new JSONException(message + this.toString());
+		return new JSONException(message + this);
 	}
 
 	/**
@@ -391,7 +456,7 @@ public class JSONTokener {
 	 * @return {@link JSONArray}
 	 */
 	public JSONArray toJSONArray() {
-		JSONArray jsonArray = new JSONArray();
+		JSONArray jsonArray = new JSONArray(this.config);
 		if (this.nextClean() != '[') {
 			throw this.syntaxError("A JSONArray text must start with '['");
 		}

@@ -1,20 +1,18 @@
 package cn.hutool.core.codec;
 
-import org.junit.Assert;
-import org.junit.Test;
-
-import cn.hutool.core.codec.BCD;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 public class BCDTest {
-	
+
 	@Test
 	public void bcdTest(){
-		String strForTest = "123456ABCDEF";
-		
+		final String strForTest = "123456ABCDEF";
+
 		//转BCD
-		byte[] bcd = BCD.strToBcd(strForTest);
-		String str = BCD.bcdToStr(bcd);
+		final byte[] bcd = BCD.strToBcd(strForTest);
+		final String str = BCD.bcdToStr(bcd);
 		//解码BCD
-		Assert.assertEquals(strForTest, str);
+		assertEquals(strForTest, str);
 	}
 }

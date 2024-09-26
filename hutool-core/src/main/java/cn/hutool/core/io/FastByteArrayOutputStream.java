@@ -1,10 +1,11 @@
 package cn.hutool.core.io;
 
+import cn.hutool.core.util.CharsetUtil;
+import cn.hutool.core.util.ObjectUtil;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
-
-import cn.hutool.core.util.CharsetUtil;
 
 /**
  * 基于快速缓冲FastByteBuffer的OutputStream，随着数据的增长自动扩充缓冲区
@@ -21,13 +22,16 @@ public class FastByteArrayOutputStream extends OutputStream {
 
 	private final FastByteBuffer buffer;
 
+	/**
+	 * 构造
+	 */
 	public FastByteArrayOutputStream() {
 		this(1024);
 	}
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param size 预估大小
 	 */
 	public FastByteArrayOutputStream(int size) {
@@ -52,7 +56,7 @@ public class FastByteArrayOutputStream extends OutputStream {
 	 * 此方法无任何效果，当流被关闭后不会抛出IOException
 	 */
 	@Override
-	public void close() throws IOException{
+	public void close() {
 		// nop
 	}
 
@@ -67,6 +71,10 @@ public class FastByteArrayOutputStream extends OutputStream {
 	 */
 	public void writeTo(OutputStream out) throws IORuntimeException {
 		final int index = buffer.index();
+		if(index < 0){
+			// 无数据写出
+			return;
+		}
 		byte[] buf;
 		try {
 			for (int i = 0; i < index; i++) {
@@ -79,7 +87,7 @@ public class FastByteArrayOutputStream extends OutputStream {
 		}
 	}
 
-	
+
 	/**
 	 * 转为Byte数组
 	 * @return Byte数组
@@ -90,7 +98,7 @@ public class FastByteArrayOutputStream extends OutputStream {
 
 	@Override
 	public String toString() {
-		return new String(toByteArray());
+		return toString(CharsetUtil.defaultCharset());
 	}
 
 	/**
@@ -101,14 +109,15 @@ public class FastByteArrayOutputStream extends OutputStream {
 	public String toString(String charsetName) {
 		return toString(CharsetUtil.charset(charsetName));
 	}
-	
+
 	/**
 	 * 转为字符串
-	 * @param charset 编码
+	 * @param charset 编码,null表示默认编码
 	 * @return 字符串
 	 */
 	public String toString(Charset charset) {
-		return new String(toByteArray(), charset);
+		return new String(toByteArray(),
+				ObjectUtil.defaultIfNull(charset, CharsetUtil.defaultCharset()));
 	}
 
 }

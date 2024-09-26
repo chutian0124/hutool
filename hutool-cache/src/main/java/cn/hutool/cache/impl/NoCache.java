@@ -1,13 +1,14 @@
 package cn.hutool.cache.impl;
 
-import java.util.Iterator;
-
 import cn.hutool.cache.Cache;
+import cn.hutool.core.exceptions.ExceptionUtil;
 import cn.hutool.core.lang.func.Func0;
+
+import java.util.Iterator;
 
 /**
  * 无缓存实现，用于快速关闭缓存
- * 
+ *
  * @param <K> 键类型
  * @param <V> 值类型
  * @author Looly,jodd
@@ -49,21 +50,41 @@ public class NoCache<K, V> implements Cache<K, V> {
 	public V get(K key, boolean isUpdateLastAccess) {
 		return null;
 	}
-	
+
 	@Override
 	public V get(K key, Func0<V> supplier) {
+		return get(key, true, supplier);
+	}
+
+	@Override
+	public V get(K key, boolean isUpdateLastAccess, Func0<V> supplier) {
+		return get(key, isUpdateLastAccess, 0, supplier);
+	}
+
+	@Override
+	public V get(K key, boolean isUpdateLastAccess, long timeout, Func0<V> supplier) {
 		try {
 			return (null == supplier) ? null : supplier.call();
 		} catch (Exception e) {
-			throw new RuntimeException(e);
+			throw ExceptionUtil.wrapRuntime(e);
 		}
 	}
 
 	@Override
 	public Iterator<V> iterator() {
-		return null;
+		return new Iterator<V>() {
+			@Override
+			public boolean hasNext() {
+				return false;
+			}
+
+			@Override
+			public V next() {
+				return null;
+			}
+		};
 	}
-	
+
 	@Override
 	public Iterator<CacheObj<K, V>> cacheObjIterator() {
 		return null;

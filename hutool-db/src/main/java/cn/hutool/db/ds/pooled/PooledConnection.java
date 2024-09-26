@@ -1,10 +1,16 @@
 package cn.hutool.db.ds.pooled;
 
+import cn.hutool.core.map.MapUtil;
+import cn.hutool.core.util.ClassUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.db.DbRuntimeException;
+import cn.hutool.db.DbUtil;
+import cn.hutool.setting.dialect.Props;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-
-import cn.hutool.db.DbUtil;
+import java.util.Properties;
 
 /**
  * 池化
@@ -12,16 +18,49 @@ import cn.hutool.db.DbUtil;
  *
  */
 public class PooledConnection extends ConnectionWraper{
-	
-	private PooledDataSource ds;
+
+	private final PooledDataSource ds;
 	private boolean isClosed;
-	
+
+	/**
+	 * 构造
+	 *
+	 * @param ds 数据源
+	 * @throws SQLException SQL异常
+	 */
 	public PooledConnection(PooledDataSource ds) throws SQLException {
 		this.ds = ds;
-		DbConfig config = ds.getConfig();
-		this.raw = DriverManager.getConnection(config.getUrl(), config.getUser(), config.getPass());
+		final DbConfig config = ds.getConfig();
+
+		// issue#IA6EUQ 部分驱动无法自动加载，此处手动完成
+		final String driver = config.getDriver();
+		if(StrUtil.isNotBlank(driver)){
+			try {
+				Class.forName(driver);
+			} catch (ClassNotFoundException e) {
+				throw new DbRuntimeException(e);
+			}
+		}
+
+		final Props info = new Props();
+		final String user = config.getUser();
+		if (user != null) {
+			info.setProperty("user", user);
+		}
+		final String password = config.getPass();
+		if (password != null) {
+			info.setProperty("password", password);
+		}
+
+		// 其它参数
+		final Properties connProps = config.getConnProps();
+		if(MapUtil.isNotEmpty(connProps)){
+			info.putAll(connProps);
+		}
+
+		this.raw = DriverManager.getConnection(config.getUrl(), info);
 	}
-	
+
 	public PooledConnection(PooledDataSource ds, Connection conn) {
 		this.ds = ds;
 		this.raw = conn;
@@ -31,7 +70,7 @@ public class PooledConnection extends ConnectionWraper{
 	 * 重写关闭连接，实际操作是归还到连接池中
 	 */
 	@Override
-	public void close() throws SQLException {
+	public void close() {
 		this.ds.free(this);
 		this.isClosed = true;
 	}
@@ -45,7 +84,7 @@ public class PooledConnection extends ConnectionWraper{
 	public boolean isClosed() throws SQLException {
 		return isClosed || raw.isClosed();
 	}
-	
+
 	/**
 	 * 打开连接
 	 * @return this

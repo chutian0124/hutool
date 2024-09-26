@@ -1,11 +1,9 @@
 package cn.hutool.db;
 
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+
 import java.sql.SQLException;
-
-import org.junit.Ignore;
-import org.junit.Test;
-
-import cn.hutool.core.lang.func.VoidFunc1;
 
 /**
  * 事务性数据库操作单元测试
@@ -13,9 +11,9 @@ import cn.hutool.core.lang.func.VoidFunc1;
  *
  */
 public class SessionTest {
-	
+
 	@Test
-	@Ignore
+	@Disabled
 	public void transTest() {
 		Session session = Session.create("test");
 		try {
@@ -26,15 +24,10 @@ public class SessionTest {
 			session.quietRollback();
 		}
 	}
-	
+
 	@Test
-	@Ignore
+	@Disabled
 	public void txTest() throws SQLException {
-		Session.create("test").tx(new VoidFunc1<Session>() {
-			@Override
-			public void call(Session session) throws SQLException {
-				session.update(Entity.create().set("age", 78), Entity.create("user").set("name", "unitTestUser"));
-			}
-		});
+		Session.create("test").tx(session -> session.update(Entity.create().set("age", 78), Entity.create("user").set("name", "unitTestUser")));
 	}
 }

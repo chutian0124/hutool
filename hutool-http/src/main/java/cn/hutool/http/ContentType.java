@@ -29,19 +29,50 @@ public enum ContentType {
 	 */
 	XML("application/xml"),
 	/**
+	 * text/plain编码
+	 */
+	TEXT_PLAIN("text/plain"),
+	/**
 	 * Rest请求text/xml编码
 	 */
-	TEXT_XML("text/xml");
+	TEXT_XML("text/xml"),
+	/**
+	 * text/html编码
+	 */
+	TEXT_HTML("text/html"),
+	/**
+	 * application/octet-stream编码
+	 */
+	OCTET_STREAM("application/octet-stream"),
+	/**
+	 * text/event-stream编码
+	 */
+	EVENT_STREAM("text/event-stream");
 
-	private String value;
+	private final String value;
 
+	/**
+	 * 构造
+	 *
+	 * @param value ContentType值
+	 */
 	ContentType(String value) {
 		this.value = value;
 	}
 
+	/**
+	 * 获取value值
+	 *
+	 * @return value值
+	 * @since 5.2.6
+	 */
+	public String getValue() {
+		return value;
+	}
+
 	@Override
 	public String toString() {
-		return value;
+		return getValue();
 	}
 
 	/**
@@ -55,14 +86,14 @@ public enum ContentType {
 	}
 
 	/**
-	 * 是否为默认Content-Type，默认包括<code>null</code>和application/x-www-form-urlencoded
+	 * 是否为默认Content-Type，默认包括{@code null}和application/x-www-form-urlencoded
 	 *
 	 * @param contentType 内容类型
 	 * @return 是否为默认Content-Type
 	 * @since 4.1.5
 	 */
 	public static boolean isDefault(String contentType) {
-		return null == contentType || isFormUrlEncoed(contentType);
+		return null == contentType || isFormUrlEncode(contentType);
 	}
 
 	/**
@@ -71,7 +102,7 @@ public enum ContentType {
 	 * @param contentType 内容类型
 	 * @return 是否为application/x-www-form-urlencoded
 	 */
-	public static boolean isFormUrlEncoed(String contentType) {
+	public static boolean isFormUrlEncode(String contentType) {
 		return StrUtil.startWithIgnoreCase(contentType, FORM_URLENCODED.toString());
 	}
 
@@ -89,7 +120,7 @@ public enum ContentType {
 	public static ContentType get(String body) {
 		ContentType contentType = null;
 		if (StrUtil.isNotBlank(body)) {
-			char firstChar = body.charAt(0);
+			char firstChar = StrUtil.trimStart(body).charAt(0);
 			switch (firstChar) {
 				case '{':
 				case '[':
@@ -118,5 +149,17 @@ public enum ContentType {
 	 */
 	public static String build(String contentType, Charset charset) {
 		return StrUtil.format("{};charset={}", contentType, charset.name());
+	}
+
+	/**
+	 * 输出Content-Type字符串，附带编码信息
+	 *
+	 * @param contentType Content-Type 枚举类型
+	 * @param charset     编码
+	 * @return Content-Type字符串
+	 * @since 5.7.15
+	 */
+	public static String build(ContentType contentType, Charset charset) {
+		return build(contentType.getValue(), charset);
 	}
 }

@@ -1,8 +1,27 @@
 package cn.hutool.core.comparator;
 
 import java.util.Comparator;
+import java.util.Objects;
+import java.util.function.Function;
 
+/**
+ * 比较工具类
+ *
+ * @author looly
+ */
 public class CompareUtil {
+
+	/**
+	 * 获取自然排序器，即默认排序器
+	 *
+	 * @param <E> 排序节点类型
+	 * @return 默认排序器
+	 * @since 5.7.21
+	 */
+	@SuppressWarnings("unchecked")
+	public static <E extends Comparable<? super E>> Comparator<E> naturalComparator() {
+		return ComparableComparator.INSTANCE;
+	}
 
 	/**
 	 * 对象比较，比较结果取决于comparator，如果被比较对象为null，传入的comparator对象应处理此情况<br>
@@ -22,7 +41,7 @@ public class CompareUtil {
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	public static <T> int compare(T c1, T c2, Comparator<T> comparator) {
 		if (null == comparator) {
-			return compare((Comparable)c1, (Comparable)c2);
+			return compare((Comparable) c1, (Comparable) c2);
 		}
 		return comparator.compare(c1, c2);
 	}
@@ -46,7 +65,7 @@ public class CompareUtil {
 	 * @param <T>           被比较对象类型（必须实现Comparable接口）
 	 * @param c1            对象1，可以为{@code null}
 	 * @param c2            对象2，可以为{@code null}
-	 * @param isNullGreater 当被比较对象为null时是否排在前面，true表示null大于任何对象，false反之
+	 * @param isNullGreater 当被比较对象为null时是否排在后面，true表示null大于任何对象，false反之
 	 * @return 比较结果，如果c1 &lt; c2，返回数小于0，c1==c2返回0，c1 &gt; c2 大于0
 	 * @see java.util.Comparator#compare(Object, Object)
 	 */
@@ -102,5 +121,70 @@ public class CompareUtil {
 		}
 
 		return result;
+	}
+
+	/**
+	 * 中文比较器
+	 *
+	 * @param keyExtractor 从对象中提取中文(参与比较的内容)
+	 * @param <T>          对象类型
+	 * @return 中文比较器
+	 * @since 5.4.3
+	 */
+	public static <T> Comparator<T> comparingPinyin(Function<T, String> keyExtractor) {
+		return comparingPinyin(keyExtractor, false);
+	}
+
+	/**
+	 * 中文（拼音）比较器
+	 *
+	 * @param keyExtractor 从对象中提取中文(参与比较的内容)
+	 * @param reverse      是否反序
+	 * @param <T>          对象类型
+	 * @return 中文比较器
+	 * @since 5.4.3
+	 */
+	public static <T> Comparator<T> comparingPinyin(Function<T, String> keyExtractor, boolean reverse) {
+		Objects.requireNonNull(keyExtractor);
+		PinyinComparator pinyinComparator = new PinyinComparator();
+		if (reverse) {
+			return (o1, o2) -> pinyinComparator.compare(keyExtractor.apply(o2), keyExtractor.apply(o1));
+		}
+		return (o1, o2) -> pinyinComparator.compare(keyExtractor.apply(o1), keyExtractor.apply(o2));
+	}
+
+	/**
+	 * 索引比较器<br>
+	 * 通过keyExtractor函数，提取对象的某个属性或规则，根据提供的排序数组，完成比较<br>
+	 *
+	 * @param keyExtractor 从对象中提取中文(参与比较的内容)
+	 * @param objs         参与排序的数组，数组的元素位置决定了对象的排序先后
+	 * @param <T>          对象类型
+	 * @param <U>          数组对象类型
+	 * @return 索引比较器
+	 * @since 5.8.0
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T, U> Comparator<T> comparingIndexed(Function<? super T, ? extends U> keyExtractor, U... objs) {
+		return comparingIndexed(keyExtractor, false, objs);
+	}
+
+	/**
+	 * 索引比较器<br>
+	 * 通过keyExtractor函数，提取对象的某个属性或规则，根据提供的排序数组，完成比较<br>
+	 *
+	 * @param keyExtractor 从对象中提取排序键的函数(参与比较的内容)
+	 * @param atEndIfMiss  如果不在列表中是否排在后边
+	 * @param objs         参与排序的数组，数组的元素位置决定了对象的排序先后
+	 * @param <T>          对象类型
+	 * @param <U>          数组对象类型
+	 * @return 索引比较器
+	 * @since 5.8.0
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T, U> Comparator<T> comparingIndexed(Function<? super T, ? extends U> keyExtractor, boolean atEndIfMiss, U... objs) {
+		Objects.requireNonNull(keyExtractor);
+		IndexedComparator<U> indexedComparator = new IndexedComparator<>(atEndIfMiss, objs);
+		return (o1, o2) -> indexedComparator.compare(keyExtractor.apply(o1), keyExtractor.apply(o2));
 	}
 }

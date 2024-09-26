@@ -1,14 +1,14 @@
 package cn.hutool.core.builder;
 
+import cn.hutool.core.util.ArrayUtil;
+
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
 import java.util.Comparator;
 
-import cn.hutool.core.util.ArrayUtil;
-
-/** 
+/**
  * 用于构建 {@link java.lang.Comparable#compareTo(Object)} 方法的辅助工具
  *
  * <p>
@@ -33,7 +33,7 @@ import cn.hutool.core.util.ArrayUtil;
  *   }
  * }
  * </pre>
- * 
+ *
  * 字段值按照顺序比较，如果某个字段返回非0结果，比较终止，使用{@code toComparison()}返回结果，后续比较忽略。
  *
  * <p>
@@ -52,7 +52,7 @@ import cn.hutool.core.util.ArrayUtil;
  */
 public class CompareToBuilder implements Builder<Integer> {
 	private static final long serialVersionUID = 1L;
-    
+
 	/** 当前比较状态 */
     private int comparison;
 
@@ -60,12 +60,11 @@ public class CompareToBuilder implements Builder<Integer> {
      * 构造，构造后调用append方法增加比较项，然后调用{@link #toComparison()}获取结果
      */
     public CompareToBuilder() {
-        super();
         comparison = 0;
     }
 
     //-----------------------------------------------------------------------
-    /** 
+    /**
      * 通过反射比较两个Bean对象，对象字段可以为private。比较规则如下：
      *
      * <ul>
@@ -94,7 +93,7 @@ public class CompareToBuilder implements Builder<Integer> {
      * <p>Compares two <code>Object</code>s via reflection.</p>
      *
      * <p>Fields can be private, thus <code>AccessibleObject.setAccessible</code>
-     * is used to bypass normal access control checks. This will fail under a 
+     * is used to bypass normal access control checks. This will fail under a
      * security manager unless the appropriate permissions are set.</p>
      *
      * <ul>
@@ -126,7 +125,7 @@ public class CompareToBuilder implements Builder<Integer> {
      * <p>Compares two <code>Object</code>s via reflection.</p>
      *
      * <p>Fields can be private, thus <code>AccessibleObject.setAccessible</code>
-     * is used to bypass normal access control checks. This will fail under a 
+     * is used to bypass normal access control checks. This will fail under a
      * security manager unless the appropriate permissions are set.</p>
      *
      * <ul>
@@ -159,7 +158,7 @@ public class CompareToBuilder implements Builder<Integer> {
      * <p>Compares two <code>Object</code>s via reflection.</p>
      *
      * <p>Fields can be private, thus <code>AccessibleObject.setAccessible</code>
-     * is used to bypass normal access control checks. This will fail under a 
+     * is used to bypass normal access control checks. This will fail under a
      * security manager unless the appropriate permissions are set.</p>
      *
      * <ul>
@@ -192,7 +191,7 @@ public class CompareToBuilder implements Builder<Integer> {
      * <p>Compares two <code>Object</code>s via reflection.</p>
      *
      * <p>Fields can be private, thus <code>AccessibleObject.setAccessible</code>
-     * is used to bypass normal access control checks. This will fail under a 
+     * is used to bypass normal access control checks. This will fail under a
      * security manager unless the appropriate permissions are set.</p>
      *
      * <ul>
@@ -221,10 +220,10 @@ public class CompareToBuilder implements Builder<Integer> {
      * @since 2.2 (2.0 as <code>reflectionCompare(Object, Object, boolean, Class)</code>)
      */
     public static int reflectionCompare(
-        final Object lhs, 
-        final Object rhs, 
-        final boolean compareTransients, 
-        final Class<?> reflectUpToClass, 
+        final Object lhs,
+        final Object rhs,
+        final boolean compareTransients,
+        final Class<?> reflectUpToClass,
         final String... excludeFields) {
 
         if (lhs == rhs) {
@@ -249,7 +248,7 @@ public class CompareToBuilder implements Builder<Integer> {
     /**
      * <p>Appends to <code>builder</code> the comparison of <code>lhs</code>
      * to <code>rhs</code> using the fields defined in <code>clazz</code>.</p>
-     * 
+     *
      * @param lhs  left-hand object
      * @param rhs  right-hand object
      * @param clazz  <code>Class</code> that defines fields to be compared
@@ -264,7 +263,7 @@ public class CompareToBuilder implements Builder<Integer> {
         final CompareToBuilder builder,
         final boolean useTransients,
         final String[] excludeFields) {
-        
+
         final Field[] fields = clazz.getDeclaredFields();
         AccessibleObject.setAccessible(fields, true);
         for (int i = 0; i < fields.length && builder.comparison == 0; i++) {
@@ -300,7 +299,7 @@ public class CompareToBuilder implements Builder<Integer> {
         comparison = superCompareTo;
         return this;
     }
-    
+
     //-----------------------------------------------------------------------
     /**
      * <p>Appends to the <code>builder</code> the comparison of
@@ -312,7 +311,7 @@ public class CompareToBuilder implements Builder<Integer> {
      *     a <code>null</code> object is less than a non-<code>null</code> object</li>
      * <li>Check the object contents</li>
      * </ol>
-     * 
+     *
      * <p><code>lhs</code> must either be an array or implement {@link Comparable}.</p>
      *
      * @param lhs  left-hand object
@@ -418,7 +417,7 @@ public class CompareToBuilder implements Builder<Integer> {
         if (comparison != 0) {
             return this;
         }
-        comparison = ((lhs < rhs) ? -1 : ((lhs > rhs) ? 1 : 0));
+        comparison = (Long.compare(lhs, rhs));
         return this;
     }
 
@@ -434,14 +433,14 @@ public class CompareToBuilder implements Builder<Integer> {
         if (comparison != 0) {
             return this;
         }
-        comparison = ((lhs < rhs) ? -1 : ((lhs > rhs) ? 1 : 0));
+        comparison = (Integer.compare(lhs, rhs));
         return this;
     }
 
     /**
      * Appends to the <code>builder</code> the comparison of
      * two <code>short</code>s.
-     * 
+     *
      * @param lhs  left-hand value
      * @param rhs  right-hand value
      * @return this - used to chain append calls
@@ -450,7 +449,7 @@ public class CompareToBuilder implements Builder<Integer> {
         if (comparison != 0) {
             return this;
         }
-        comparison = ((lhs < rhs) ? -1 : ((lhs > rhs) ? 1 : 0));
+        comparison = (Short.compare(lhs, rhs));
         return this;
     }
 
@@ -466,14 +465,14 @@ public class CompareToBuilder implements Builder<Integer> {
         if (comparison != 0) {
             return this;
         }
-        comparison = ((lhs < rhs) ? -1 : ((lhs > rhs) ? 1 : 0));
+        comparison = (Character.compare(lhs, rhs));
         return this;
     }
 
     /**
      * Appends to the <code>builder</code> the comparison of
      * two <code>byte</code>s.
-     * 
+     *
      * @param lhs  left-hand value
      * @param rhs  right-hand value
      * @return this - used to chain append calls
@@ -482,7 +481,7 @@ public class CompareToBuilder implements Builder<Integer> {
         if (comparison != 0) {
             return this;
         }
-        comparison = ((lhs < rhs) ? -1 : ((lhs > rhs) ? 1 : 0));
+        comparison = (Byte.compare(lhs, rhs));
         return this;
     }
 
@@ -575,7 +574,7 @@ public class CompareToBuilder implements Builder<Integer> {
     public CompareToBuilder append(final Object[] lhs, final Object[] rhs) {
         return append(lhs, rhs, null);
     }
-    
+
     /**
      * <p>Appends to the <code>builder</code> the deep comparison of
      * two <code>Object</code> arrays.</p>
@@ -950,7 +949,7 @@ public class CompareToBuilder implements Builder<Integer> {
      * the <code>builder</code> has judged the "left-hand" side
      * as less than, greater than, or equal to the "right-hand"
      * side.
-     * 
+     *
      * @return final comparison result
      * @see #build()
      */
@@ -963,7 +962,7 @@ public class CompareToBuilder implements Builder<Integer> {
      * the <code>builder</code> has judged the "left-hand" side
      * as less than, greater than, or equal to the "right-hand"
      * side.
-     * 
+     *
      * @return final comparison result as an Integer
      * @see #toComparison()
      * @since 3.0

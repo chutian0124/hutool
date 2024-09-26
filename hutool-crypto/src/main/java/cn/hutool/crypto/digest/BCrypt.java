@@ -1,8 +1,8 @@
 package cn.hutool.crypto.digest;
 
-import java.security.SecureRandom;
-
 import cn.hutool.core.util.CharsetUtil;
+
+import java.security.SecureRandom;
 
 /**
  * BCrypt加密算法实现。由它加密的文件可在所有支持的操作系统和处理器上进行转移。它的口令必须是8至56个字符，并将在内部被转化为448位的密钥。
@@ -11,22 +11,22 @@ import cn.hutool.core.util.CharsetUtil;
  * <p>
  * 使用方法如下：
  * <p>
- * <code>
+ * {@code
  * String pw_hash = BCrypt.hashpw(plain_password, BCrypt.gensalt());
- * </code>
+ * }
  * <p>
  * 使用checkpw方法检查被加密的字符串是否与原始字符串匹配：
  * <p>
- * <code>
+ * {@code
  * BCrypt.checkpw(candidate_password, stored_hash);
- * </code>
+ * }
  * <p>
  * gensalt方法提供了可选参数 (log_rounds) 来定义加盐多少，也决定了加密的复杂度:
  * <p>
- * <code>
+ * {@code
  * String strong_salt = BCrypt.gensalt(10);
  * String stronger_salt = BCrypt.gensalt(12);
- * </code>
+ * }
  *
  * @author Damien Miller
  * @since 4.1.1
@@ -177,9 +177,9 @@ public class BCrypt {
 	 * @return the decoded value of x
 	 */
 	private static byte char64(char x) {
-		if ((int) x < 0 || (int) x > index_64.length)
+		if ((int) x > index_64.length)
 			return -1;
-		return index_64[(int) x];
+		return index_64[x];
 	}
 
 	/**
@@ -191,6 +191,7 @@ public class BCrypt {
 	 * @return an array containing the decoded bytes
 	 * @throws IllegalArgumentException if maxolen is invalid
 	 */
+	@SuppressWarnings("SameParameterValue")
 	private static byte[] decodeBase64(String s, int maxolen) throws IllegalArgumentException {
 		final StringBuilder rs = new StringBuilder();
 		int off = 0, slen = s.length(), olen = 0;
@@ -285,8 +286,8 @@ public class BCrypt {
 	 * Initialise the Blowfish key schedule
 	 */
 	private void init_key() {
-		P = (int[]) P_orig.clone();
-		S = (int[]) S_orig.clone();
+		P = P_orig.clone();
+		S = S_orig.clone();
 	}
 
 	/**
@@ -423,7 +424,9 @@ public class BCrypt {
 			off = 3;
 		else {
 			minor = salt.charAt(2);
-			if (minor != 'a' || salt.charAt(3) != '$')
+			// pr#1560@Github
+			// 修正一个在Blowfish实现上的安全风险
+			if ((minor != 'a' && minor != 'x' && minor != 'y' && minor != 'b') || salt.charAt(3) != '$')
 				throw new IllegalArgumentException("Invalid salt revision");
 			off = 4;
 		}
@@ -438,7 +441,7 @@ public class BCrypt {
 		saltb = decodeBase64(real_salt, BCRYPT_SALT_LEN);
 
 		bcrypt = new BCrypt();
-		hashed = bcrypt.crypt(passwordb, saltb, rounds, (int[]) bf_crypt_ciphertext.clone());
+		hashed = bcrypt.crypt(passwordb, saltb, rounds, bf_crypt_ciphertext.clone());
 
 		rs.append("$2");
 		if (minor >= 'a')
@@ -510,7 +513,14 @@ public class BCrypt {
 	public static boolean checkpw(String plaintext, String hashed) {
 		byte[] hashed_bytes;
 		byte[] try_bytes;
-		String try_pw = hashpw(plaintext, hashed);
+
+		String try_pw;
+		try{
+			try_pw = hashpw(plaintext, hashed);
+		} catch (Exception ignore){
+			// 生成密文时错误直接返回false issue#1377@Github
+			return false;
+		}
 		hashed_bytes = hashed.getBytes(CharsetUtil.CHARSET_UTF_8);
 		try_bytes = try_pw.getBytes(CharsetUtil.CHARSET_UTF_8);
 		if (hashed_bytes.length != try_bytes.length) {

@@ -1,5 +1,10 @@
 package cn.hutool.system;
 
+import cn.hutool.core.convert.Convert;
+import cn.hutool.core.lang.Singleton;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.util.SystemPropsUtil;
+
 import java.io.PrintWriter;
 import java.lang.management.ClassLoadingMXBean;
 import java.lang.management.CompilationMXBean;
@@ -12,12 +17,6 @@ import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
 import java.lang.management.ThreadMXBean;
 import java.util.List;
-import java.util.Properties;
-
-import cn.hutool.core.convert.Convert;
-import cn.hutool.core.lang.Console;
-import cn.hutool.core.lang.Singleton;
-import cn.hutool.core.util.StrUtil;
 
 /**
  * Java的System类封装工具类。<br>
@@ -25,7 +24,7 @@ import cn.hutool.core.util.StrUtil;
  *
  * @author Looly
  */
-public class SystemUtil {
+public class SystemUtil extends SystemPropsUtil {
 
 	// ----- Java运行时环境信息 -----/
 	/**
@@ -149,117 +148,6 @@ public class SystemUtil {
 	 */
 	public final static String USER_DIR = SystemPropsKeys.USER_DIR;
 
-	// ----------------------------------------------------------------------- Basic start
-
-	/**
-	 * 取得系统属性，如果因为Java安全的限制而失败，则将错误打在Log中，然后返回 defaultValue
-	 *
-	 * @param name         属性名
-	 * @param defaultValue 默认值
-	 * @return 属性值或defaultValue
-	 * @see System#getProperty(String)
-	 * @see System#getenv(String)
-	 */
-	public static String get(String name, String defaultValue) {
-		return StrUtil.nullToDefault(get(name, false), defaultValue);
-	}
-
-	/**
-	 * 取得系统属性，如果因为Java安全的限制而失败，则将错误打在Log中，然后返回 {@code null}
-	 *
-	 * @param name  属性名
-	 * @param quiet 安静模式，不将出错信息打在<code>System.err</code>中
-	 * @return 属性值或{@code null}
-	 * @see System#getProperty(String)
-	 * @see System#getenv(String)
-	 */
-	public static String get(String name, boolean quiet) {
-		String value = null;
-		try {
-			value = System.getProperty(name);
-		} catch (SecurityException e) {
-			if (false == quiet) {
-				Console.error("Caught a SecurityException reading the system property '{}'; " +
-						"the SystemUtil property value will default to null.", name);
-			}
-		}
-
-		if (null == value) {
-			try {
-				value = System.getenv(name);
-			} catch (SecurityException e) {
-				if (false == quiet) {
-					Console.error("Caught a SecurityException reading the system env '{}'; " +
-							"the SystemUtil env value will default to null.", name);
-				}
-			}
-		}
-
-		return value;
-	}
-
-	/**
-	 * 获得System属性
-	 *
-	 * @param key 键
-	 * @return 属性值
-	 * @see System#getProperty(String)
-	 * @see System#getenv(String)
-	 */
-	public static String get(String key) {
-		return get(key, null);
-	}
-
-	/**
-	 * 获得boolean类型值
-	 *
-	 * @param key          键
-	 * @param defaultValue 默认值
-	 * @return 值
-	 */
-	public static boolean getBoolean(String key, boolean defaultValue) {
-		String value = get(key);
-		if (value == null) {
-			return defaultValue;
-		}
-
-		value = value.trim().toLowerCase();
-		if (value.isEmpty()) {
-			return true;
-		}
-
-		return Convert.toBool(value, defaultValue);
-	}
-
-	/**
-	 * 获得int类型值
-	 *
-	 * @param key          键
-	 * @param defaultValue 默认值
-	 * @return 值
-	 */
-	public static long getInt(String key, int defaultValue) {
-		return Convert.toInt(get(key), defaultValue);
-	}
-
-	/**
-	 * 获得long类型值
-	 *
-	 * @param key          键
-	 * @param defaultValue 默认值
-	 * @return 值
-	 */
-	public static long getLong(String key, long defaultValue) {
-		return Convert.toLong(get(key), defaultValue);
-	}
-
-	/**
-	 * @return 属性列表
-	 */
-	public static Properties props() {
-		return System.getProperties();
-	}
-
 	/**
 	 * 获取当前进程 PID
 	 *
@@ -268,7 +156,6 @@ public class SystemUtil {
 	public static long getCurrentPID() {
 		return Long.parseLong(getRuntimeMXBean().getName().split("@")[0]);
 	}
-	// ----------------------------------------------------------------------- Basic end
 
 	/**
 	 * 返回Java虚拟机类加载系统相关属性
@@ -312,9 +199,9 @@ public class SystemUtil {
 
 	/**
 	 * 返回Java虚拟机编译系统相关属性<br>
-	 * 如果没有编译系统，则返回<code>null</code>
+	 * 如果没有编译系统，则返回{@code null}
 	 *
-	 * @return a {@link CompilationMXBean} ，如果没有编译系统，则返回<code>null</code>
+	 * @return  {@link CompilationMXBean} ，如果没有编译系统，则返回{@code null}
 	 * @since 4.1.4
 	 */
 	public static CompilationMXBean getCompilationMXBean() {
@@ -363,7 +250,7 @@ public class SystemUtil {
 	/**
 	 * 取得Java Virtual Machine Specification的信息。
 	 *
-	 * @return <code>JvmSpecInfo</code>对象
+	 * @return {@link JvmSpecInfo}对象
 	 */
 	public static JvmSpecInfo getJvmSpecInfo() {
 		return Singleton.get(JvmSpecInfo.class);
@@ -372,7 +259,7 @@ public class SystemUtil {
 	/**
 	 * 取得Java Virtual Machine Implementation的信息。
 	 *
-	 * @return <code>JvmInfo</code>对象
+	 * @return {@link JvmInfo}对象
 	 */
 	public static JvmInfo getJvmInfo() {
 		return Singleton.get(JvmInfo.class);
@@ -381,7 +268,7 @@ public class SystemUtil {
 	/**
 	 * 取得Java Specification的信息。
 	 *
-	 * @return <code>JavaSpecInfo</code>对象
+	 * @return {@link JavaSpecInfo}对象
 	 */
 	public static JavaSpecInfo getJavaSpecInfo() {
 		return Singleton.get(JavaSpecInfo.class);
@@ -390,7 +277,7 @@ public class SystemUtil {
 	/**
 	 * 取得Java Implementation的信息。
 	 *
-	 * @return <code>JavaInfo</code>对象
+	 * @return {@link JavaInfo}对象
 	 */
 	public static JavaInfo getJavaInfo() {
 		return Singleton.get(JavaInfo.class);
@@ -399,7 +286,7 @@ public class SystemUtil {
 	/**
 	 * 取得当前运行的JRE的信息。
 	 *
-	 * @return <code>JreInfo</code>对象
+	 * @return {@link JavaRuntimeInfo}对象
 	 */
 	public static JavaRuntimeInfo getJavaRuntimeInfo() {
 		return Singleton.get(JavaRuntimeInfo.class);
@@ -408,7 +295,7 @@ public class SystemUtil {
 	/**
 	 * 取得OS的信息。
 	 *
-	 * @return <code>OsInfo</code>对象
+	 * @return {@code OsInfo}对象
 	 */
 	public static OsInfo getOsInfo() {
 		return Singleton.get(OsInfo.class);
@@ -417,7 +304,7 @@ public class SystemUtil {
 	/**
 	 * 取得User的信息。
 	 *
-	 * @return <code>UserInfo</code>对象
+	 * @return {@code UserInfo}对象
 	 */
 	public static UserInfo getUserInfo() {
 		return Singleton.get(UserInfo.class);
@@ -426,7 +313,7 @@ public class SystemUtil {
 	/**
 	 * 取得Host的信息。
 	 *
-	 * @return <code>HostInfo</code>对象
+	 * @return {@link HostInfo}对象
 	 */
 	public static HostInfo getHostInfo() {
 		return Singleton.get(HostInfo.class);
@@ -435,7 +322,7 @@ public class SystemUtil {
 	/**
 	 * 取得Runtime的信息。
 	 *
-	 * @return <code>RuntimeInfo</code>对象
+	 * @return {@link RuntimeInfo}对象
 	 */
 	public static RuntimeInfo getRuntimeInfo() {
 		return Singleton.get(RuntimeInfo.class);
@@ -487,16 +374,16 @@ public class SystemUtil {
 	// ------------------------------------------------------------------ Dump
 
 	/**
-	 * 将系统信息输出到<code>System.out</code>中。
+	 * 将系统信息输出到{@link System#out}中。
 	 */
 	public static void dumpSystemInfo() {
 		dumpSystemInfo(new PrintWriter(System.out));
 	}
 
 	/**
-	 * 将系统信息输出到指定<code>PrintWriter</code>中。
+	 * 将系统信息输出到指定{@link PrintWriter}中。
 	 *
-	 * @param out <code>PrintWriter</code>输出流
+	 * @param out {@link PrintWriter}输出流
 	 */
 	public static void dumpSystemInfo(PrintWriter out) {
 		out.println("--------------");
@@ -522,9 +409,9 @@ public class SystemUtil {
 	}
 
 	/**
-	 * 输出到<code>StringBuilder</code>。
+	 * 输出到{@link StringBuilder}。
 	 *
-	 * @param builder <code>StringBuilder</code>对象
+	 * @param builder {@link StringBuilder}对象
 	 * @param caption 标题
 	 * @param value   值
 	 */

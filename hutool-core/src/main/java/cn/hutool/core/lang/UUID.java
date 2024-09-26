@@ -1,12 +1,12 @@
 package cn.hutool.core.lang;
 
+import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
+
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Random;
-
-import cn.hutool.core.util.RandomUtil;
-import cn.hutool.core.util.StrUtil;
 
 /**
  * 提供通用唯一识别码（universally unique identifier）（UUID）实现，UUID表示一个128位的值。<br>
@@ -40,7 +40,7 @@ import cn.hutool.core.util.StrUtil;
  *
  * @since 4.1.11
  */
-public final class UUID implements java.io.Serializable, Comparable<UUID> {
+public class UUID implements java.io.Serializable, Comparable<UUID> {
 	private static final long serialVersionUID = -1185015143654744140L;
 
 	/**
@@ -49,7 +49,7 @@ public final class UUID implements java.io.Serializable, Comparable<UUID> {
 	 * @author looly
 	 */
 	private static class Holder {
-		static final SecureRandom numberGenerator = RandomUtil.getSecureRandom();
+		static final SecureRandom NUMBER_GENERATOR = RandomUtil.getSecureRandom();
 	}
 
 	/**
@@ -117,14 +117,16 @@ public final class UUID implements java.io.Serializable, Comparable<UUID> {
 	 * @return 随机生成的 {@code UUID}
 	 */
 	public static UUID randomUUID(boolean isSecure) {
-		final Random ng = isSecure ? Holder.numberGenerator : RandomUtil.getRandom();
+		final Random ng = isSecure ? Holder.NUMBER_GENERATOR : RandomUtil.getRandom();
 
-		byte[] randomBytes = new byte[16];
+		final byte[] randomBytes = new byte[16];
 		ng.nextBytes(randomBytes);
+
 		randomBytes[6] &= 0x0f; /* clear version */
 		randomBytes[6] |= 0x40; /* set to version 4 */
 		randomBytes[8] &= 0x3f; /* clear variant */
 		randomBytes[8] |= 0x80; /* set to IETF variant */
+
 		return new UUID(randomBytes);
 	}
 
@@ -165,15 +167,15 @@ public final class UUID implements java.io.Serializable, Comparable<UUID> {
 			components[i] = "0x" + components[i];
 		}
 
-		long mostSigBits = Long.decode(components[0]).longValue();
+		long mostSigBits = Long.decode(components[0]);
 		mostSigBits <<= 16;
-		mostSigBits |= Long.decode(components[1]).longValue();
+		mostSigBits |= Long.decode(components[1]);
 		mostSigBits <<= 16;
-		mostSigBits |= Long.decode(components[2]).longValue();
+		mostSigBits |= Long.decode(components[2]);
 
-		long leastSigBits = Long.decode(components[3]).longValue();
+		long leastSigBits = Long.decode(components[3]);
 		leastSigBits <<= 48;
-		leastSigBits |= Long.decode(components[4]).longValue();
+		leastSigBits |= Long.decode(components[4]);
 
 		return new UUID(mostSigBits, leastSigBits);
 	}
@@ -374,6 +376,7 @@ public final class UUID implements java.io.Serializable, Comparable<UUID> {
 	 *
 	 * @return UUID 的哈希码值。
 	 */
+	@Override
 	public int hashCode() {
 		long hilo = mostSigBits ^ leastSigBits;
 		return ((int) (hilo >> 32)) ^ (int) hilo;
@@ -387,6 +390,7 @@ public final class UUID implements java.io.Serializable, Comparable<UUID> {
 	 * @param obj 要与之比较的对象
 	 * @return 如果对象相同，则返回 {@code true}；否则返回 {@code false}
 	 */
+	@Override
 	public boolean equals(Object obj) {
 		if ((null == obj) || (obj.getClass() != UUID.class)) {
 			return false;
@@ -406,14 +410,15 @@ public final class UUID implements java.io.Serializable, Comparable<UUID> {
 	 * @param val 与此 UUID 比较的 UUID
 	 * @return 在此 UUID 小于、等于或大于 val 时，分别返回 -1、0 或 1。
 	 */
+	@Override
 	public int compareTo(UUID val) {
 		// The ordering is intentionally set up so that the UUIDs
 		// can simply be numerically compared as two numbers
-		return (this.mostSigBits < val.mostSigBits ? -1 : //
-				(this.mostSigBits > val.mostSigBits ? 1 : //
-						(this.leastSigBits < val.leastSigBits ? -1 : //
-								(this.leastSigBits > val.leastSigBits ? 1 : //
-										0))));
+		int compare = Long.compare(this.mostSigBits, val.mostSigBits);
+		if(0 == compare){
+			compare = Long.compare(this.leastSigBits, val.leastSigBits);
+		}
+		return compare;
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------- Private method start

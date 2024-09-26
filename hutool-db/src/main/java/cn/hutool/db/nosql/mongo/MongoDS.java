@@ -6,29 +6,35 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.db.DbRuntimeException;
 import cn.hutool.log.Log;
 import cn.hutool.setting.Setting;
-import com.mongodb.MongoClient;
-import com.mongodb.MongoClientOptions;
-import com.mongodb.MongoClientOptions.Builder;
+import com.mongodb.MongoClientSettings;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.connection.ConnectionPoolSettings;
+import com.mongodb.connection.SocketSettings;
 import org.bson.Document;
 
 import java.io.Closeable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
- * MongoDB工具类
- * 
- * @author xiaoleilu
+ * MongoDB4工具类
  *
+ * @author VampireAchao
  */
 public class MongoDS implements Closeable {
+
 	private final static Log log = Log.get();
 
-	/** 默认配置文件 */
+	/**
+	 * 默认配置文件
+	 */
 	public final static String MONGO_CONFIG_PATH = "config/mongo.setting";
 
 	// MongoDB配置文件
@@ -41,10 +47,11 @@ public class MongoDS implements Closeable {
 	private MongoClient mongo;
 
 	// --------------------------------------------------------------------------- Constructor start
+
 	/**
 	 * 构造MongoDB数据源<br>
 	 * 调用者必须持有MongoDS实例，否则会被垃圾回收导致写入失败！
-	 * 
+	 *
 	 * @param host 主机（域名或者IP）
 	 * @param port 端口
 	 */
@@ -56,10 +63,10 @@ public class MongoDS implements Closeable {
 	/**
 	 * 构造MongoDB数据源<br>
 	 * 调用者必须持有MongoDS实例，否则会被垃圾回收导致写入失败！
-	 * 
+	 *
 	 * @param mongoSetting MongoDB的配置文件，如果是null则读取默认配置文件或者使用MongoDB默认客户端配置
-	 * @param host 主机（域名或者IP）
-	 * @param port 端口
+	 * @param host         主机（域名或者IP）
+	 * @param port         端口
 	 */
 	public MongoDS(Setting mongoSetting, String host, int port) {
 		this.setting = mongoSetting;
@@ -71,7 +78,7 @@ public class MongoDS implements Closeable {
 	 * 构造MongoDB数据源<br>
 	 * 当提供多个数据源时，这些数据源将为一个副本集或者多个mongos<br>
 	 * 调用者必须持有MongoDS实例，否则会被垃圾回收导致写入失败！ 官方文档： http://docs.mongodb.org/manual/administration/replica-sets/
-	 * 
+	 *
 	 * @param groups 分组列表，当为null或空时使用无分组配置，一个分组使用单一模式，否则使用副本集模式
 	 */
 	public MongoDS(String... groups) {
@@ -84,9 +91,9 @@ public class MongoDS implements Closeable {
 	 * 当提供多个数据源时，这些数据源将为一个副本集或者mongos<br>
 	 * 调用者必须持有MongoDS实例，否则会被垃圾回收导致写入失败！<br>
 	 * 官方文档： http://docs.mongodb.org/manual/administration/replica-sets/
-	 * 
+	 *
 	 * @param mongoSetting MongoDB的配置文件，必须有
-	 * @param groups 分组列表，当为null或空时使用无分组配置，一个分组使用单一模式，否则使用副本集模式
+	 * @param groups       分组列表，当为null或空时使用无分组配置，一个分组使用单一模式，否则使用副本集模式
 	 */
 	public MongoDS(Setting mongoSetting, String... groups) {
 		if (mongoSetting == null) {
@@ -112,16 +119,16 @@ public class MongoDS implements Closeable {
 	/**
 	 * 初始化<br>
 	 * 设定文件中的host和端口有三种形式：
-	 * 
+	 *
 	 * <pre>
 	 * host = host:port
 	 * </pre>
-	 * 
+	 *
 	 * <pre>
 	 * host = host
 	 * port = port
 	 * </pre>
-	 * 
+	 *
 	 * <pre>
 	 * host = host
 	 * </pre>
@@ -146,11 +153,13 @@ public class MongoDS implements Closeable {
 
 		final MongoCredential credentail = createCredentail(group);
 		try {
-			if (null == credentail) {
-				mongo = new MongoClient(serverAddress, buildMongoClientOptions(group));
-			} else {
-				mongo = new MongoClient(serverAddress, credentail, buildMongoClientOptions(group));
+			MongoClientSettings.Builder clusterSettingsBuilder = MongoClientSettings.builder()
+					.applyToClusterSettings(b -> b.hosts(Collections.singletonList(serverAddress)));
+			buildMongoClientSettings(clusterSettingsBuilder, group);
+			if (null != credentail) {
+				clusterSettingsBuilder.credential(credentail);
 			}
+			mongo = MongoClients.create(clusterSettingsBuilder.build());
 		} catch (Exception e) {
 			throw new DbRuntimeException(StrUtil.format("Init MongoDB pool with connection to [{}] error!", serverAddress), e);
 		}
@@ -162,15 +171,15 @@ public class MongoDS implements Closeable {
 	 * 初始化集群<br>
 	 * 集群的其它客户端设定参数使用全局设定<br>
 	 * 集群中每一个实例成员用一个group表示，例如：
-	 * 
+	 *
 	 * <pre>
 	 * user = test1
 	 * pass = 123456
 	 * database = test
 	 * [db0]
-	 * host = 192.168.1.1:27117 
+	 * host = 192.168.1.1:27117
 	 * [db1]
-	 * host = 192.168.1.1:27118 
+	 * host = 192.168.1.1:27118
 	 * [db2]
 	 * host = 192.168.1.1:27119
 	 * </pre>
@@ -192,11 +201,13 @@ public class MongoDS implements Closeable {
 
 		final MongoCredential credentail = createCredentail(StrUtil.EMPTY);
 		try {
-			if (null == credentail) {
-				mongo = new MongoClient(addrList, buildMongoClientOptions(StrUtil.EMPTY));
-			} else {
-				mongo = new MongoClient(addrList, credentail, buildMongoClientOptions(StrUtil.EMPTY));
+			MongoClientSettings.Builder clusterSettingsBuilder = MongoClientSettings.builder()
+					.applyToClusterSettings(b -> b.hosts(addrList));
+			buildMongoClientSettings(clusterSettingsBuilder, StrUtil.EMPTY);
+			if (null != credentail) {
+				clusterSettingsBuilder.credential(credentail);
 			}
+			mongo = MongoClients.create(clusterSettingsBuilder.build());
 		} catch (Exception e) {
 			log.error(e, "Init MongoDB connection error!");
 			return;
@@ -207,7 +218,7 @@ public class MongoDS implements Closeable {
 
 	/**
 	 * 设定MongoDB配置文件
-	 * 
+	 *
 	 * @param setting 配置文件
 	 */
 	public void setSetting(Setting setting) {
@@ -223,7 +234,7 @@ public class MongoDS implements Closeable {
 
 	/**
 	 * 获得DB
-	 * 
+	 *
 	 * @param dbName DB
 	 * @return DB
 	 */
@@ -233,8 +244,8 @@ public class MongoDS implements Closeable {
 
 	/**
 	 * 获得MongoDB中指定集合对象
-	 * 
-	 * @param dbName 库名
+	 *
+	 * @param dbName         库名
 	 * @param collectionName 集合名
 	 * @return DBCollection
 	 */
@@ -248,10 +259,11 @@ public class MongoDS implements Closeable {
 	}
 
 	// --------------------------------------------------------------------------- Private method start
+
 	/**
 	 * 创建ServerAddress对象，会读取配置文件中的相关信息
-	 * 
-	 * @param group 分组，如果为null默认为无分组
+	 *
+	 * @param group 分组，如果为{@code null}或者""默认为无分组
 	 * @return ServerAddress
 	 */
 	private ServerAddress createServerAddress(String group) {
@@ -272,7 +284,7 @@ public class MongoDS implements Closeable {
 
 	/**
 	 * 创建ServerAddress对象
-	 * 
+	 *
 	 * @param host 主机域名或者IP（如果为空默认127.0.0.1）
 	 * @param port 端口（如果为空默认为）
 	 * @return ServerAddress
@@ -284,14 +296,14 @@ public class MongoDS implements Closeable {
 	/**
 	 * 创建{@link MongoCredential}，用于服务端验证<br>
 	 * 此方法会首先读取指定分组下的属性，用户没有定义则读取空分组下的属性
-	 * 
+	 *
 	 * @param group 分组
 	 * @return {@link MongoCredential}，如果用户未指定用户名密码返回null
 	 * @since 4.1.20
 	 */
 	private MongoCredential createCredentail(String group) {
 		final Setting setting = this.setting;
-		if(null == setting) {
+		if (null == setting) {
 			return null;
 		}
 		final String user = setting.getStr("user", group, setting.getStr("user"));
@@ -302,7 +314,7 @@ public class MongoDS implements Closeable {
 
 	/**
 	 * 创建{@link MongoCredential}，用于服务端验证
-	 * 
+	 *
 	 * @param userName 用户名
 	 * @param database 数据库名
 	 * @param password 密码
@@ -318,26 +330,16 @@ public class MongoDS implements Closeable {
 
 	/**
 	 * 构件MongoDB连接选项<br>
-	 * 
-	 * @param group 分组,当分组对应的选项不存在时会读取根选项，如果也不存在使用默认值
-	 * @return MongoClientOptions
-	 */
-	private MongoClientOptions buildMongoClientOptions(String group) {
-		return buildMongoClientOptions(MongoClientOptions.builder(), group).build();
-	}
-
-	/**
-	 * 构件MongoDB连接选项<br>
-	 * 
+	 *
 	 * @param group 分组，当分组对应的选项不存在时会读取根选项，如果也不存在使用默认值
 	 * @return Builder
 	 */
-	private Builder buildMongoClientOptions(Builder builder, String group) {
+	private MongoClientSettings.Builder buildMongoClientSettings(MongoClientSettings.Builder builder, String group) {
 		if (setting == null) {
 			return builder;
 		}
 
-		if (group == null) {
+		if (StrUtil.isEmpty(group)) {
 			group = StrUtil.EMPTY;
 		} else {
 			group = group + StrUtil.DOT;
@@ -348,20 +350,10 @@ public class MongoDS implements Closeable {
 		if (StrUtil.isBlank(group) == false && connectionsPerHost == null) {
 			connectionsPerHost = setting.getInt("connectionsPerHost");
 		}
+		ConnectionPoolSettings.Builder connectionPoolSettingsBuilder = ConnectionPoolSettings.builder();
 		if (connectionsPerHost != null) {
-			builder.connectionsPerHost(connectionsPerHost);
+			connectionPoolSettingsBuilder.maxSize(connectionsPerHost);
 			log.debug("MongoDB connectionsPerHost: {}", connectionsPerHost);
-		}
-
-		// multiplier for connectionsPerHost for # of threads that can block if connectionsPerHost is 10, and threadsAllowedToBlockForConnectionMultiplier is 5, then 50 threads can block more than
-		// that and an exception will be throw --int
-		Integer threadsAllowedToBlockForConnectionMultiplier = setting.getInt(group + "threadsAllowedToBlockForConnectionMultiplier");
-		if (StrUtil.isBlank(group) == false && threadsAllowedToBlockForConnectionMultiplier == null) {
-			threadsAllowedToBlockForConnectionMultiplier = setting.getInt("threadsAllowedToBlockForConnectionMultiplier");
-		}
-		if (threadsAllowedToBlockForConnectionMultiplier != null) {
-			builder.threadsAllowedToBlockForConnectionMultiplier(threadsAllowedToBlockForConnectionMultiplier);
-			log.debug("MongoDB threadsAllowedToBlockForConnectionMultiplier: {}", threadsAllowedToBlockForConnectionMultiplier);
 		}
 
 		// 被阻塞线程从连接池获取连接的最长等待时间（ms） --int
@@ -370,9 +362,10 @@ public class MongoDS implements Closeable {
 			setting.getInt("connectTimeout");
 		}
 		if (connectTimeout != null) {
-			builder.connectTimeout(connectTimeout);
+			connectionPoolSettingsBuilder.maxWaitTime(connectTimeout, TimeUnit.MILLISECONDS);
 			log.debug("MongoDB connectTimeout: {}", connectTimeout);
 		}
+		builder.applyToConnectionPoolSettings(b -> b.applySettings(connectionPoolSettingsBuilder.build()));
 
 		// 套接字超时时间;该值会被传递给Socket.setSoTimeout(int)。默以为0（无穷） --int
 		Integer socketTimeout = setting.getInt(group + "socketTimeout");
@@ -380,7 +373,8 @@ public class MongoDS implements Closeable {
 			setting.getInt("socketTimeout");
 		}
 		if (socketTimeout != null) {
-			builder.socketTimeout(socketTimeout);
+			SocketSettings socketSettings = SocketSettings.builder().connectTimeout(socketTimeout, TimeUnit.MILLISECONDS).build();
+			builder.applyToSocketSettings(b -> b.applySettings(socketSettings));
 			log.debug("MongoDB socketTimeout: {}", socketTimeout);
 		}
 
@@ -389,7 +383,7 @@ public class MongoDS implements Closeable {
 
 	/**
 	 * 检查Setting配置文件
-	 * 
+	 *
 	 * @return Setting配置文件
 	 */
 	private Setting checkSetting() {
@@ -399,4 +393,5 @@ public class MongoDS implements Closeable {
 		return this.setting;
 	}
 	// --------------------------------------------------------------------------- Private method end
+
 }

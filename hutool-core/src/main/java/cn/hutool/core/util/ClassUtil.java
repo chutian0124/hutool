@@ -1,20 +1,6 @@
 package cn.hutool.core.util;
 
-import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.Type;
-import java.net.URI;
-import java.net.URL;
-import java.util.Date;
-import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-
+import cn.hutool.core.bean.NullWrapperBean;
 import cn.hutool.core.convert.BasicType;
 import cn.hutool.core.exceptions.UtilException;
 import cn.hutool.core.io.FileUtil;
@@ -24,6 +10,22 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.core.lang.ClassScanner;
 import cn.hutool.core.lang.Filter;
 import cn.hutool.core.lang.Singleton;
+
+import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
+import java.net.URI;
+import java.net.URL;
+import java.time.temporal.TemporalAccessor;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * 类工具类 <br>
@@ -143,7 +145,14 @@ public class ClassUtil {
 		Object obj;
 		for (int i = 0; i < objects.length; i++) {
 			obj = objects[i];
-			classes[i] = (null == obj) ? Object.class : obj.getClass();
+			if (obj instanceof NullWrapperBean) {
+				// 自定义null值的参数类型
+				classes[i] = ((NullWrapperBean<?>) obj).getWrappedClass();
+			} else if (null == obj) {
+				classes[i] = Object.class;
+			} else {
+				classes[i] = obj.getClass();
+			}
 		}
 		return classes;
 	}
@@ -195,7 +204,7 @@ public class ClassUtil {
 	}
 
 	/**
-	 * 扫面该包路径下所有class文件
+	 * 扫描该包路径下所有class文件
 	 *
 	 * @return 类集合
 	 * @see ClassScanner#scanPackage()
@@ -205,7 +214,7 @@ public class ClassUtil {
 	}
 
 	/**
-	 * 扫面该包路径下所有class文件
+	 * 扫描该包路径下所有class文件
 	 *
 	 * @param packageName 包路径 com | com. | com.abs | com.abs.
 	 * @return 类集合
@@ -216,7 +225,7 @@ public class ClassUtil {
 	}
 
 	/**
-	 * 扫面包路径下满足class过滤器条件的所有class文件，<br>
+	 * 扫描包路径下满足class过滤器条件的所有class文件，<br>
 	 * 如果包路径为 com.abs + A.class 但是输入 abs会产生classNotFoundException<br>
 	 * 因为className 应该为 com.abs.A 现在却成为abs.A,此工具类对该异常进行忽略处理,有可能是一个不完善的地方，以后需要进行修改<br>
 	 *
@@ -285,7 +294,7 @@ public class ClassUtil {
 	}
 
 	/**
-	 * 查找指定Public方法 如果找不到对应的方法或方法不为public的则返回<code>null</code>
+	 * 查找指定Public方法 如果找不到对应的方法或方法不为public的则返回{@code null}
 	 *
 	 * @param clazz      类
 	 * @param methodName 方法名
@@ -332,7 +341,7 @@ public class ClassUtil {
 	}
 
 	/**
-	 * 查找指定类中的所有方法（包括非public方法），也包括父类和Object类的方法 找不到方法会返回<code>null</code>
+	 * 查找指定类中的所有方法（包括非public方法），也包括父类和Object类的方法 找不到方法会返回{@code null}
 	 *
 	 * @param clazz          被查找的类
 	 * @param methodName     方法名
@@ -347,7 +356,7 @@ public class ClassUtil {
 	// ----------------------------------------------------------------------------------------- Field
 
 	/**
-	 * 查找指定类中的所有字段（包括非public字段）， 字段不存在则返回<code>null</code>
+	 * 查找指定类中的所有字段（包括非public字段）， 字段不存在则返回{@code null}
 	 *
 	 * @param clazz     被查找字段的类
 	 * @param fieldName 字段名
@@ -538,7 +547,7 @@ public class ClassUtil {
 	 *
 	 * <pre>
 	 * 1、获取当前线程的ContextClassLoader
-	 * 2、获取{@link ClassUtil}类对应的ClassLoader
+	 * 2、获取{@link ClassLoaderUtil}类对应的ClassLoader
 	 * 3、获取系统ClassLoader（{@link ClassLoader#getSystemClassLoader()}）
 	 * </pre>
 	 *
@@ -549,7 +558,7 @@ public class ClassUtil {
 	}
 
 	/**
-	 * 比较判断types1和types2两组类，如果types1中所有的类都与types2对应位置的类相同，或者是其父类或接口，则返回<code>true</code>
+	 * 比较判断types1和types2两组类，如果types1中所有的类都与types2对应位置的类相同，或者是其父类或接口，则返回{@code true}
 	 *
 	 * @param types1 类组1
 	 * @param types2 类组2
@@ -617,7 +626,7 @@ public class ClassUtil {
 	 * 非单例模式，如果是非静态方法，每次创建一个新对象
 	 *
 	 * @param <T>                     对象类型
-	 * @param classNameWithMethodName 类名和方法名表达式，类名与方法名用<code>.</code>或<code>#</code>连接 例如：com.xiaoleilu.hutool.StrUtil.isEmpty 或 com.xiaoleilu.hutool.StrUtil#isEmpty
+	 * @param classNameWithMethodName 类名和方法名表达式，类名与方法名用{@code .}或{@code #}连接 例如：com.xiaoleilu.hutool.StrUtil.isEmpty 或 com.xiaoleilu.hutool.StrUtil#isEmpty
 	 * @param args                    参数，必须严格对应指定方法的参数类型和数量
 	 * @return 返回结果
 	 */
@@ -712,7 +721,7 @@ public class ClassUtil {
 		if (null == clazz) {
 			return false;
 		}
-		return BasicType.wrapperPrimitiveMap.containsKey(clazz);
+		return BasicType.WRAPPER_PRIMITIVE_MAP.containsKey(clazz);
 	}
 
 	/**
@@ -744,7 +753,17 @@ public class ClassUtil {
 
 	/**
 	 * 是否为简单值类型<br>
-	 * 包括：原始类型,、String、other CharSequence, a Number, a Date, a URI, a URL, a Locale or a Class.
+	 * 包括：
+	 * <pre>
+	 *     原始类型
+	 *     String、other CharSequence
+	 *     Number
+	 *     Date
+	 *     URI
+	 *     URL
+	 *     Locale
+	 *     Class
+	 * </pre>
 	 *
 	 * @param clazz 类
 	 * @return 是否为简单值类型
@@ -758,7 +777,9 @@ public class ClassUtil {
 				|| clazz.equals(URI.class) //
 				|| clazz.equals(URL.class) //
 				|| clazz.equals(Locale.class) //
-				|| clazz.equals(Class.class);//
+				|| clazz.equals(Class.class)//
+				// jdk8 date object
+				|| TemporalAccessor.class.isAssignableFrom(clazz); //
 	}
 
 	/**
@@ -785,11 +806,11 @@ public class ClassUtil {
 		// 基本类型
 		if (targetType.isPrimitive()) {
 			// 原始类型
-			Class<?> resolvedPrimitive = BasicType.wrapperPrimitiveMap.get(sourceType);
+			Class<?> resolvedPrimitive = BasicType.WRAPPER_PRIMITIVE_MAP.get(sourceType);
 			return targetType.equals(resolvedPrimitive);
 		} else {
 			// 包装类型
-			Class<?> resolvedWrapper = BasicType.primitiveWrapperMap.get(sourceType);
+			Class<?> resolvedWrapper = BasicType.PRIMITIVE_WRAPPER_MAP.get(sourceType);
 			return resolvedWrapper != null && targetType.isAssignableFrom(resolvedWrapper);
 		}
 	}
@@ -929,10 +950,7 @@ public class ClassUtil {
 	 */
 	public static Class<?> getTypeArgument(Class<?> clazz, int index) {
 		final Type argumentType = TypeUtil.getTypeArgument(clazz, index);
-		if (argumentType instanceof Class) {
-			return (Class<?>) argumentType;
-		}
-		return null;
+		return TypeUtil.getClass(argumentType);
 	}
 
 	/**
@@ -981,26 +999,44 @@ public class ClassUtil {
 	 * @since 3.0.8
 	 */
 	public static Object getDefaultValue(Class<?> clazz) {
+		// 原始类型
 		if (clazz.isPrimitive()) {
-			if (long.class == clazz) {
-				return 0L;
-			} else if (int.class == clazz) {
-				return 0;
-			} else if (short.class == clazz) {
-				return (short) 0;
-			} else if (char.class == clazz) {
-				return (char) 0;
-			} else if (byte.class == clazz) {
-				return (byte) 0;
-			} else if (double.class == clazz) {
-				return 0D;
-			} else if (float.class == clazz) {
-				return 0f;
-			} else if (boolean.class == clazz) {
-				return false;
-			}
+			return getPrimitiveDefaultValue(clazz);
 		}
+		return null;
+	}
 
+	/**
+	 * 获取指定原始类型分的默认值<br>
+	 * 默认值规则为：
+	 *
+	 * <pre>
+	 * 1、如果为原始类型，返回0
+	 * 2、非原始类型返回{@code null}
+	 * </pre>
+	 *
+	 * @param clazz 类
+	 * @return 默认值
+	 * @since 5.8.0
+	 */
+	public static Object getPrimitiveDefaultValue(Class<?> clazz) {
+		if (long.class == clazz) {
+			return 0L;
+		} else if (int.class == clazz) {
+			return 0;
+		} else if (short.class == clazz) {
+			return (short) 0;
+		} else if (char.class == clazz) {
+			return (char) 0;
+		} else if (byte.class == clazz) {
+			return (byte) 0;
+		} else if (double.class == clazz) {
+			return 0D;
+		} else if (float.class == clazz) {
+			return 0f;
+		} else if (boolean.class == clazz) {
+			return false;
+		}
 		return null;
 	}
 
@@ -1040,5 +1076,60 @@ public class ClassUtil {
 		return objectPackageName.startsWith("java.") //
 				|| objectPackageName.startsWith("javax.") //
 				|| clazz.getClassLoader() == null;
+	}
+
+	/**
+	 * 获取class类路径URL, 不管是否在jar包中都会返回文件夹的路径<br>
+	 * class在jar包中返回jar所在文件夹,class不在jar中返回文件夹目录<br>
+	 * jdk中的类不能使用此方法
+	 *
+	 * @param clazz 类
+	 * @return URL
+	 * @since 5.2.4
+	 */
+	public static URL getLocation(Class<?> clazz) {
+		if (null == clazz) {
+			return null;
+		}
+		return clazz.getProtectionDomain().getCodeSource().getLocation();
+	}
+
+	/**
+	 * 获取class类路径, 不管是否在jar包中都会返回文件夹的路径<br>
+	 * class在jar包中返回jar所在文件夹,class不在jar中返回文件夹目录<br>
+	 * jdk中的类不能使用此方法
+	 *
+	 * @param clazz 类
+	 * @return class路径
+	 * @since 5.2.4
+	 */
+	public static String getLocationPath(Class<?> clazz) {
+		final URL location = getLocation(clazz);
+		if (null == location) {
+			return null;
+		}
+		return location.getPath();
+	}
+
+	/**
+	 * 是否为抽象类或接口
+	 *
+	 * @param clazz 类
+	 * @return 是否为抽象类或接口
+	 * @since 5.8.2
+	 */
+	public static boolean isAbstractOrInterface(Class<?> clazz) {
+		return isAbstract(clazz) || isInterface(clazz);
+	}
+
+	/**
+	 * 是否为接口
+	 *
+	 * @param clazz 类
+	 * @return 是否为接口
+	 * @since 5.8.2
+	 */
+	public static boolean isInterface(Class<?> clazz) {
+		return clazz.isInterface();
 	}
 }

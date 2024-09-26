@@ -8,13 +8,11 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.core.util.TypeUtil;
 
 import java.lang.reflect.Type;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * {@link Map} 转换器
- * 
+ *
  * @author Looly
  * @since 3.0.8
  */
@@ -30,7 +28,7 @@ public class MapConverter extends AbstractConverter<Map<?, ?>> {
 
 	/**
 	 * 构造，Map的key和value泛型类型自动获取
-	 * 
+	 *
 	 * @param mapType Map类型
 	 */
 	public MapConverter(Type mapType) {
@@ -39,7 +37,7 @@ public class MapConverter extends AbstractConverter<Map<?, ?>> {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param mapType Map类型
 	 * @param keyType 键类型
 	 * @param valueType 值类型
@@ -55,41 +53,49 @@ public class MapConverter extends AbstractConverter<Map<?, ?>> {
 	protected Map<?, ?> convertInternal(Object value) {
 		Map map;
 		if (value instanceof Map) {
-			final Type[] typeArguments = TypeUtil.getTypeArguments(value.getClass());
-			if (null != typeArguments //
-					&& 2 == typeArguments.length//
-					&& Objects.equals(this.keyType, typeArguments[0]) //
-					&& Objects.equals(this.valueType, typeArguments[1])) {
-				//对于键值对类型一致的Map对象，不再做转换，直接返回原对象
-				return (Map) value;
+			final Class<?> valueClass = value.getClass();
+			if(valueClass.equals(this.mapType)){
+				final Type[] typeArguments = TypeUtil.getTypeArguments(valueClass);
+				if (null != typeArguments //
+						&& 2 == typeArguments.length//
+						&& Objects.equals(this.keyType, typeArguments[0]) //
+						&& Objects.equals(this.valueType, typeArguments[1])) {
+					//对于键值对类型一致的Map对象，不再做转换，直接返回原对象
+					return (Map) value;
+				}
 			}
-			map = MapUtil.createMap(TypeUtil.getClass(this.mapType));
+
+			final Class<?> mapClass = TypeUtil.getClass(this.mapType);
+			if (null == mapClass || mapClass.isAssignableFrom(AbstractMap.class)) {
+				// issue#I6YN2A，默认有序
+				map =  new LinkedHashMap<>();
+			} else{
+				map = MapUtil.createMap(mapClass);
+			}
 			convertMapToMap((Map) value, map);
 		} else if (BeanUtil.isBean(value.getClass())) {
 			map = BeanUtil.beanToMap(value);
 			// 二次转换，转换键值类型
 			map = convertInternal(map);
 		} else {
-			throw new UnsupportedOperationException(StrUtil.format("Unsupport toMap value type: {}", value.getClass().getName()));
+			throw new UnsupportedOperationException(StrUtil.format("Unsupported toMap value type: {}", value.getClass().getName()));
 		}
 		return map;
 	}
 
 	/**
 	 * Map转Map
-	 * 
+	 *
 	 * @param srcMap 源Map
 	 * @param targetMap 目标Map
 	 */
 	private void convertMapToMap(Map<?, ?> srcMap, Map<Object, Object> targetMap) {
 		final ConverterRegistry convert = ConverterRegistry.getInstance();
-		Object key;
-		Object value;
-		for (Entry<?, ?> entry : srcMap.entrySet()) {
-			key = TypeUtil.isUnknow(this.keyType) ? entry.getKey() : convert.convert(this.keyType, entry.getKey());
-			value = TypeUtil.isUnknow(this.valueType) ? entry.getValue() : convert.convert(this.valueType, entry.getValue());
+		srcMap.forEach((key, value)->{
+			key = TypeUtil.isUnknown(this.keyType) ? key : convert.convert(this.keyType, key);
+			value = TypeUtil.isUnknown(this.valueType) ? value : convert.convert(this.valueType, value);
 			targetMap.put(key, value);
-		}
+		});
 	}
 
 	@Override

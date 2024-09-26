@@ -2,18 +2,19 @@ package cn.hutool.json;
 
 /**
  * XML分析器，继承自JSONTokener，提供XML的语法分析
- * 
+ *
  * @author JSON.org
  */
 public class XMLTokener extends JSONTokener {
 
 	/**
-	 * The table of entity values. It initially contains Character values for amp, apos, gt, lt, quot.
+	 * The table of entity values.
+	 * It initially contains Character values for amp, apos, gt, lt, quot.
 	 */
 	public static final java.util.HashMap<String, Character> entity;
 
 	static {
-		entity = new java.util.HashMap<String, Character>(8);
+		entity = new java.util.HashMap<>(8);
 		entity.put("amp", XML.AMP);
 		entity.put("apos", XML.APOS);
 		entity.put("gt", XML.GT);
@@ -23,24 +24,25 @@ public class XMLTokener extends JSONTokener {
 
 	/**
 	 * Construct an XMLTokener from a string.
-	 * 
-	 * @param s A source string.
+	 *
+	 * @param s      A source string.
+	 * @param config JSON配置
 	 */
-	public XMLTokener(String s) {
-		super(s);
+	public XMLTokener(CharSequence s, JSONConfig config) {
+		super(s, config);
 	}
 
 	/**
 	 * Get the text in the CDATA block.
-	 * 
-	 * @return The string up to the <code>]]&gt;</code>.
-	 * @throws JSONException If the <code>]]&gt;</code> is not found.
+	 *
+	 * @return The string up to the {@code ]]>}.
+	 * @throws JSONException If the {@code ]]>} is not found.
 	 */
 	public String nextCDATA() throws JSONException {
 		char c;
 		int i;
-		StringBuilder sb = new StringBuilder();
-		for (;;) {
+		final StringBuilder sb = new StringBuilder();
+		for (; ; ) {
 			c = next();
 			if (end()) {
 				throw syntaxError("Unclosed CDATA");
@@ -55,7 +57,7 @@ public class XMLTokener extends JSONTokener {
 	}
 
 	/**
-	 * Get the next XML outer token, trimming whitespace. 
+	 * Get the next XML outer token, trimming whitespace.
 	 * There are two kinds of tokens: the '&gt;' character which begins a markup tag, and the content text between markup tags.
 	 *
 	 * @return A string, or a '&gt;' Character, or null if there is no more source text.
@@ -63,7 +65,7 @@ public class XMLTokener extends JSONTokener {
 	 */
 	public Object nextContent() throws JSONException {
 		char c;
-		StringBuilder sb;
+		final StringBuilder sb;
 		do {
 			c = next();
 		} while (Character.isWhitespace(c));
@@ -74,7 +76,7 @@ public class XMLTokener extends JSONTokener {
 			return XML.LT;
 		}
 		sb = new StringBuilder();
-		for (;;) {
+		for (; ; ) {
 			if (c == '<' || c == 0) {
 				back();
 				return sb.toString().trim();
@@ -89,16 +91,17 @@ public class XMLTokener extends JSONTokener {
 	}
 
 	/**
-	 * Return the next entity. These entities are translated to Characters: <code>&amp;  '  &gt;  &lt;  &quot;</code>.
-	 * 
+	 * Return the next entity. These entities are translated to Characters: {@code &  '  >  <  "}.
+	 *
 	 * @param ampersand An ampersand character.
 	 * @return A Character or an entity String if the entity is not recognized.
 	 * @throws JSONException If missing ';' in XML entity.
 	 */
 	public Object nextEntity(char ampersand) throws JSONException {
-		StringBuilder sb = new StringBuilder();
-		for (;;) {
-			char c = next();
+		final StringBuilder sb = new StringBuilder();
+		char c;
+		for (; ; ) {
+			c = next();
 			if (Character.isLetterOrDigit(c) || c == '#') {
 				sb.append(Character.toLowerCase(c));
 			} else if (c == ';') {
@@ -107,15 +110,44 @@ public class XMLTokener extends JSONTokener {
 				throw syntaxError("Missing ';' in XML entity: &" + sb);
 			}
 		}
-		String string = sb.toString();
-		Object object = entity.get(string);
-		return object != null ? object : ampersand + string + ";";
+		return unescapeEntity(sb.toString());
+	}
+
+	/**
+	 * Unescape an XML entity encoding;
+	 *
+	 * @param e entity (only the actual entity value, not the preceding & or ending ;
+	 * @return Unescape str
+	 */
+	static String unescapeEntity(final String e) {
+		// validate
+		if (e == null || e.isEmpty()) {
+			return "";
+		}
+		// if our entity is an encoded unicode point, parse it.
+		if (e.charAt(0) == '#') {
+			final int cp;
+			if (e.charAt(1) == 'x' || e.charAt(1) == 'X') {
+				// hex encoded unicode
+				cp = Integer.parseInt(e.substring(2), 16);
+			} else {
+				// decimal encoded unicode
+				cp = Integer.parseInt(e.substring(1));
+			}
+			return new String(new int[]{cp}, 0, 1);
+		}
+		final Character knownEntity = entity.get(e);
+		if (knownEntity == null) {
+			// we don't know the entity so keep it encoded
+			return '&' + e + ';';
+		}
+		return knownEntity.toString();
 	}
 
 	/**
 	 * Returns the next XML meta token. This is used for skipping over &lt;!...&gt; and &lt;?...?&gt; structures.
-	 * 
-	 * @return Syntax characters (<code>&lt; &gt; / = ! ?</code>) are returned as Character, and strings and names are returned as Boolean. We don't care what the values actually are.
+	 *
+	 * @return Syntax characters ({@code < > / = ! ?}) are returned as Character, and strings and names are returned as Boolean. We don't care what the values actually are.
 	 * @throws JSONException 字符串中属性未关闭或XML结构错误抛出此异常。If a string is not properly closed or if the XML is badly structured.
 	 */
 	public Object nextMeta() throws JSONException {
@@ -142,7 +174,7 @@ public class XMLTokener extends JSONTokener {
 			case '"':
 			case '\'':
 				q = c;
-				for (;;) {
+				for (; ; ) {
 					c = next();
 					if (c == 0) {
 						throw syntaxError("Unterminated string");
@@ -152,7 +184,7 @@ public class XMLTokener extends JSONTokener {
 					}
 				}
 			default:
-				for (;;) {
+				for (; ; ) {
 					c = next();
 					if (Character.isWhitespace(c)) {
 						return Boolean.TRUE;
@@ -175,9 +207,10 @@ public class XMLTokener extends JSONTokener {
 	}
 
 	/**
-	 * Get the next XML Token. These tokens are found inside of angle brackets. It may be one of these characters: <code>/ &gt; = ! ?</code> or it may be a string wrapped in single quotes or double
+	 * Get the next XML Token. These tokens are found inside of angle brackets. <br>
+	 * It may be one of these characters: {@code / > = ! ?} or it may be a string wrapped in single quotes or double
 	 * quotes, or it may be a name.
-	 * 
+	 *
 	 * @return a String or a Character.
 	 * @throws JSONException If the XML is not well formed.
 	 */
@@ -210,7 +243,7 @@ public class XMLTokener extends JSONTokener {
 			case '\'':
 				q = c;
 				sb = new StringBuilder();
-				for (;;) {
+				for (; ; ) {
 					c = next();
 					if (c == 0) {
 						throw syntaxError("Unterminated string");
@@ -229,7 +262,7 @@ public class XMLTokener extends JSONTokener {
 				// Name
 
 				sb = new StringBuilder();
-				for (;;) {
+				for (; ; ) {
 					sb.append(c);
 					c = next();
 					if (Character.isWhitespace(c)) {
@@ -258,7 +291,7 @@ public class XMLTokener extends JSONTokener {
 
 	/**
 	 * Skip characters until past the requested string. If it is not found, we are left at the end of the source with a result of false.
-	 * 
+	 *
 	 * @param to A string to skip past.
 	 * @return 是否成功skip
 	 * @throws JSONException JSON异常
@@ -286,7 +319,7 @@ public class XMLTokener extends JSONTokener {
 
 		/* We will loop, possibly for all of the remaining characters. */
 
-		for (;;) {
+		for (; ; ) {
 			j = offset;
 			b = true;
 

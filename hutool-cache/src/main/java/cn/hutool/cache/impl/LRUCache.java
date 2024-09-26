@@ -1,8 +1,9 @@
 package cn.hutool.cache.impl;
 
-import java.util.Iterator;
-
+import cn.hutool.core.lang.mutable.Mutable;
 import cn.hutool.core.map.FixedLinkedHashMap;
+
+import java.util.Iterator;
 
 /**
  * LRU (least recently used)最近最久未使用缓存<br>
@@ -16,7 +17,7 @@ import cn.hutool.core.map.FixedLinkedHashMap;
  * @param <K> 键类型
  * @param <V> 值类型
  */
-public class LRUCache<K, V> extends AbstractCache<K, V> {
+public class LRUCache<K, V> extends ReentrantCache<K, V> {
 	private static final long serialVersionUID = 1L;
 
 	/**
@@ -37,18 +38,24 @@ public class LRUCache<K, V> extends AbstractCache<K, V> {
 		if(Integer.MAX_VALUE == capacity) {
 			capacity -= 1;
 		}
-		
+
 		this.capacity = capacity;
 		this.timeout = timeout;
-		
+
 		//链表key按照访问顺序排序，调用get方法后，会将这次访问的元素移至头部
-		cacheMap = new FixedLinkedHashMap<K, CacheObj<K, V>>(capacity);
+		final FixedLinkedHashMap<Mutable<K>, CacheObj<K, V>> fixedLinkedHashMap = new FixedLinkedHashMap<>(capacity);
+		fixedLinkedHashMap.setRemoveListener(entry -> {
+			if(null != listener){
+				listener.onRemove(entry.getKey().get(), entry.getValue().getValue());
+			}
+		});
+		cacheMap = fixedLinkedHashMap;
 	}
 
 	// ---------------------------------------------------------------- prune
 
 	/**
-	 * 只清理超时对象，LRU的实现会交给<code>LinkedHashMap</code>
+	 * 只清理超时对象，LRU的实现会交给{@code LinkedHashMap}
 	 */
 	@Override
 	protected int pruneCache() {
@@ -56,7 +63,7 @@ public class LRUCache<K, V> extends AbstractCache<K, V> {
 			return 0;
 		}
 		int count = 0;
-		Iterator<CacheObj<K, V>> values = cacheMap.values().iterator();
+		Iterator<CacheObj<K, V>> values = cacheObjIter();
 		CacheObj<K, V> co;
 		while (values.hasNext()) {
 			co = values.next();

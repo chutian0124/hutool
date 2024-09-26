@@ -1,5 +1,8 @@
 package cn.hutool.core.io.resource;
 
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.io.IORuntimeException;
+
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.Serializable;
@@ -10,25 +13,22 @@ import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
 
-import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.io.IORuntimeException;
-
 /**
  * 多资源组合资源<br>
  * 此资源为一个利用游标自循环资源，只有调用{@link #next()} 方法才会获取下一个资源，使用完毕后调用{@link #reset()}方法重置游标
- * 
+ *
  * @author looly
  * @since 4.1.0
  */
 public class MultiResource implements Resource, Iterable<Resource>, Iterator<Resource>, Serializable {
 	private static final long serialVersionUID = 1L;
 
-	private List<Resource> resources;
+	private final List<Resource> resources;
 	private int cursor;
-	
+
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param resources 资源数组
 	 */
 	public MultiResource(Resource... resources) {
@@ -37,7 +37,7 @@ public class MultiResource implements Resource, Iterable<Resource>, Iterator<Res
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param resources 资源列表
 	 */
 	public MultiResource(Collection<Resource> resources) {
@@ -61,6 +61,11 @@ public class MultiResource implements Resource, Iterable<Resource>, Iterator<Res
 	@Override
 	public InputStream getStream() {
 		return resources.get(cursor).getStream();
+	}
+
+	@Override
+	public boolean isModified() {
+		return resources.get(cursor).isModified();
 	}
 
 	@Override
@@ -94,7 +99,7 @@ public class MultiResource implements Resource, Iterable<Resource>, Iterator<Res
 	}
 
 	@Override
-	public Resource next() {
+	public synchronized Resource next() {
 		if (cursor >= resources.size()) {
 			throw new ConcurrentModificationException();
 		}
@@ -110,10 +115,10 @@ public class MultiResource implements Resource, Iterable<Resource>, Iterator<Res
 	/**
 	 * 重置游标
 	 */
-	public void reset() {
+	public synchronized void reset() {
 		this.cursor = 0;
 	}
-	
+
 	/**
 	 * 增加资源
 	 * @param resource 资源

@@ -1,19 +1,28 @@
 package cn.hutool.json;
 
+import cn.hutool.core.bean.BeanPath;
+import cn.hutool.core.bean.copier.IJSONTypeConverter;
+import cn.hutool.core.lang.TypeReference;
+
 import java.io.Serializable;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.reflect.Type;
-
-import cn.hutool.core.bean.BeanPath;
-import cn.hutool.core.lang.TypeReference;
 
 /**
  * JSON接口
  *
  * @author Looly
  */
-public interface JSON extends Cloneable, Serializable {
+public interface JSON extends Cloneable, Serializable, IJSONTypeConverter {
+
+	/**
+	 * 获取JSON配置
+	 *
+	 * @return {@link JSONConfig}
+	 * @since 5.8.6
+	 */
+	JSONConfig getConfig();
 
 	/**
 	 * 通过表达式获取JSON中嵌套的对象<br>
@@ -108,9 +117,7 @@ public interface JSON extends Cloneable, Serializable {
 	 */
 	default String toJSONString(int indentFactor) throws JSONException {
 		final StringWriter sw = new StringWriter();
-		synchronized (sw.getBuffer()) {
-			return this.write(sw, indentFactor, 0).toString();
-		}
+		return this.write(sw, indentFactor, 0).toString();
 	}
 
 	/**
@@ -169,7 +176,7 @@ public interface JSON extends Cloneable, Serializable {
 	 * @since 3.0.8
 	 */
 	default <T> T toBean(Type type) {
-		return toBean(type, false);
+		return JSONConverter.jsonConvert(type, this, getConfig());
 	}
 
 	/**
@@ -180,8 +187,10 @@ public interface JSON extends Cloneable, Serializable {
 	 * @param ignoreError 是否忽略转换错误
 	 * @return 实体类对象
 	 * @since 4.3.2
+	 * @deprecated 请使用 {@link #toBean(Type)}, ignoreError在JSONConfig中生效
 	 */
+	@Deprecated
 	default <T> T toBean(Type type, boolean ignoreError) {
-		return JSONConverter.jsonConvert(type, this, ignoreError);
+		return JSONConverter.jsonConvert(type, this, JSONConfig.create().setIgnoreError(ignoreError));
 	}
 }

@@ -1,72 +1,208 @@
 package cn.hutool.core.lang;
 
+import cn.hutool.core.map.WeakConcurrentMap;
+
 import java.util.regex.Pattern;
 
-import cn.hutool.core.util.ReUtil;
-
 /**
- * 常用正则表达式集合
- * 
- * @author Looly
+ * 常用正则表达式集合，更多正则见:<br>
+ * <a href="https://any86.github.io/any-rule/">https://any86.github.io/any-rule/</a>
  *
+ * @author Looly
  */
 public class PatternPool {
 
-	/** 英文字母 、数字和下划线 */
-	public final static Pattern GENERAL = Pattern.compile("^\\w+$");
-	/** 数字 */
-	public final static Pattern NUMBERS = Pattern.compile("\\d+");
-	/** 字母 */
-	public final static Pattern WORD = Pattern.compile("[a-zA-Z]+");
-	/** 单个中文汉字 */
-	public final static Pattern CHINESE = Pattern.compile(ReUtil.RE_CHINESE);
-	/** 中文汉字 */
-	public final static Pattern CHINESES = Pattern.compile(ReUtil.RE_CHINESES);
-	/** 分组 */
-	public final static Pattern GROUP_VAR = Pattern.compile("\\$(\\d+)");
-	/** IP v4 */
-	public final static Pattern IPV4 = Pattern.compile("\\b((?!\\d\\d\\d)\\d+|1\\d\\d|2[0-4]\\d|25[0-5])\\.((?!\\d\\d\\d)\\d+|1\\d\\d|2[0-4]\\d|25[0-5])\\.((?!\\d\\d\\d)\\d+|1\\d\\d|2[0-4]\\d|25[0-5])\\.((?!\\d\\d\\d)\\d+|1\\d\\d|2[0-4]\\d|25[0-5])\\b");
-	/** IP v6 */
-	public final static Pattern IPV6 = Pattern.compile("(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))");
-	/** 货币 */
-	public final static Pattern MONEY = Pattern.compile("^(\\d+(?:\\.\\d+)?)$");
-	/** 邮件，符合RFC 5322规范，正则来自：http://emailregex.com/ */
-	// public final static Pattern EMAIL = Pattern.compile("(\\w|.)+@\\w+(\\.\\w+){1,2}");
-	public final static Pattern EMAIL = Pattern.compile("(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)])", Pattern.CASE_INSENSITIVE);
-	/** 移动电话 */
-	public final static Pattern MOBILE = Pattern.compile("(?:0|86|\\+86)?1[3456789]\\d{9}");
-	/** 18位身份证号码 */
-	public final static Pattern CITIZEN_ID = Pattern.compile("[1-9]\\d{5}[1-2]\\d{3}((0\\d)|(1[0-2]))(([012]\\d)|3[0-1])\\d{3}(\\d|X|x)");
-	/** 邮编 */
-	public final static Pattern ZIP_CODE = Pattern.compile("[1-9]\\d{5}(?!\\d)");
-	/** 生日 */
-	public final static Pattern BIRTHDAY = Pattern.compile("^(\\d{2,4})([/\\-.年]?)(\\d{1,2})([/\\-.月]?)(\\d{1,2})日?$");
-	/** URL */
-	public final static Pattern URL = Pattern.compile("[a-zA-z]+://[^\\s]*");
-	/** Http URL */
-	public final static Pattern URL_HTTP = Pattern.compile("(https://|http://)?([\\w-]+\\.)+[\\w-]+(:\\d+)*(/[\\w- ./?%&=]*)?");
-	/** 中文字、英文字母、数字和下划线 */
-	public final static Pattern GENERAL_WITH_CHINESE = Pattern.compile("^[\u4E00-\u9FFF\\w]+$");
-	/** UUID */
-	public final static Pattern UUID = Pattern.compile("^[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12}$");
-	/** 不带横线的UUID */
-	public final static Pattern UUID_SIMPLE = Pattern.compile("^[0-9a-z]{32}$");
-	/** 中国车牌号码 */
-	public final static Pattern PLATE_NUMBER = Pattern.compile("^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领A-Z][A-Z][A-Z0-9]{4}[A-Z0-9挂学警港澳]$");
-	/** MAC地址正则 */
-	public static final Pattern MAC_ADDRESS = Pattern.compile("((?:[A-F0-9]{1,2}[:-]){5}[A-F0-9]{1,2})|(?:0x)(\\d{12})(?:.+ETHER)", Pattern.CASE_INSENSITIVE);
-	/** 16进制字符串 */
-	public static final Pattern HEX = Pattern.compile("^[a-f0-9]+$", Pattern.CASE_INSENSITIVE);
-	/** 时间正则 */
-	public static final Pattern TIME = Pattern.compile("\\d{1,2}:\\d{1,2}(:\\d{1,2})?");
+	/**
+	 * 英文字母 、数字和下划线
+	 */
+	public final static Pattern GENERAL = Pattern.compile(RegexPool.GENERAL);
+	/**
+	 * 数字
+	 */
+	public final static Pattern NUMBERS = Pattern.compile(RegexPool.NUMBERS);
+	/**
+	 * 字母
+	 */
+	public final static Pattern WORD = Pattern.compile(RegexPool.WORD);
+	/**
+	 * 单个中文汉字
+	 */
+	public final static Pattern CHINESE = Pattern.compile(RegexPool.CHINESE);
+	/**
+	 * 中文汉字
+	 */
+	public final static Pattern CHINESES = Pattern.compile(RegexPool.CHINESES);
+	/**
+	 * 分组
+	 */
+	public final static Pattern GROUP_VAR = Pattern.compile(RegexPool.GROUP_VAR);
+	/**
+	 * IP v4
+	 */
+	public final static Pattern IPV4 = Pattern.compile(RegexPool.IPV4);
+	/**
+	 * IP v6
+	 */
+	public final static Pattern IPV6 = Pattern.compile(RegexPool.IPV6);
+	/**
+	 * 货币
+	 */
+	public final static Pattern MONEY = Pattern.compile(RegexPool.MONEY);
+	/**
+	 * 邮件，符合RFC 5322规范，正则来自：<a href="http://emailregex.com/">http://emailregex.com/</a><br>
+	 * <a href="https://stackoverflow.com/questions/386294/what-is-the-maximum-length-of-a-valid-email-address/44317754">https://stackoverflow.com/questions/386294/what-is-the-maximum-length-of-a-valid-email-address/44317754</a>
+	 * 注意email 要宽松一点。比如 jetz.chong@hutool.cn、jetz-chong@ hutool.cn、jetz_chong@hutool.cn、dazhi.duan@hutool.cn 宽松一点把，都算是正常的邮箱
+	 */
+	public final static Pattern EMAIL = Pattern.compile(RegexPool.EMAIL, Pattern.CASE_INSENSITIVE);
+
+	/**
+	 * 规则同EMAIL，添加了对中文的支持
+	 */
+	public final static Pattern EMAIL_WITH_CHINESE = Pattern.compile(RegexPool.EMAIL_WITH_CHINESE,Pattern.CASE_INSENSITIVE);
+	/**
+	 * 移动电话
+	 */
+	public final static Pattern MOBILE = Pattern.compile(RegexPool.MOBILE);
+	/**
+	 * 中国香港移动电话
+	 * eg: 中国香港： +852 5100 4810， 三位区域码+10位数字, 中国香港手机号码8位数
+	 * eg: 中国大陆： +86  180 4953 1399，2位区域码标示+13位数字
+	 * 中国大陆 +86 Mainland China
+	 * 中国香港 +852 Hong Kong
+	 * 中国澳门 +853 Macao
+	 * 中国台湾 +886 Taiwan
+	 */
+	public final static Pattern MOBILE_HK = Pattern.compile(RegexPool.MOBILE_HK);
+	/**
+	 * 中国台湾移动电话
+	 * eg: 中国台湾： +886 09 60 000000， 三位区域码+号码以数字09开头 + 8位数字, 中国台湾手机号码10位数
+	 * 中国台湾 +886 Taiwan 国际域名缩写：TW
+	 */
+	public final static Pattern MOBILE_TW = Pattern.compile(RegexPool.MOBILE_TW);
+	/**
+	 * 中国澳门移动电话
+	 * eg: 中国台湾： +853 68 00000， 三位区域码 +号码以数字6开头 + 7位数字, 中国台湾手机号码8位数
+	 * 中国澳门 +853 Macao 国际域名缩写：MO
+	 */
+	public final static Pattern MOBILE_MO = Pattern.compile(RegexPool.MOBILE_MO);
+	/**
+	 * 座机号码
+	 */
+	public final static Pattern TEL = Pattern.compile(RegexPool.TEL);
+	/**
+	 * 座机号码+400+800电话
+	 *
+	 * @see <a href="https://baike.baidu.com/item/800">800</a>
+	 */
+	public final static Pattern TEL_400_800 = Pattern.compile(RegexPool.TEL_400_800);
+	/**
+	 * 18位身份证号码
+	 */
+	public final static Pattern CITIZEN_ID = Pattern.compile(RegexPool.CITIZEN_ID);
+	/**
+	 * 邮编，兼容港澳台
+	 */
+	public final static Pattern ZIP_CODE = Pattern.compile(RegexPool.ZIP_CODE);
+	/**
+	 * 生日
+	 */
+	public final static Pattern BIRTHDAY = Pattern.compile(RegexPool.BIRTHDAY);
+	/**
+	 * URL
+	 */
+	public final static Pattern URL = Pattern.compile(RegexPool.URL);
+	/**
+	 * Http URL
+	 */
+	public final static Pattern URL_HTTP = Pattern.compile(RegexPool.URL_HTTP, Pattern.CASE_INSENSITIVE);
+	/**
+	 * 中文字、英文字母、数字和下划线
+	 */
+	public final static Pattern GENERAL_WITH_CHINESE = Pattern.compile(RegexPool.GENERAL_WITH_CHINESE);
+	/**
+	 * UUID
+	 */
+	public final static Pattern UUID = Pattern.compile(RegexPool.UUID, Pattern.CASE_INSENSITIVE);
+	/**
+	 * 不带横线的UUID
+	 */
+	public final static Pattern UUID_SIMPLE = Pattern.compile(RegexPool.UUID_SIMPLE);
+	/**
+	 * MAC地址正则
+	 */
+	public static final Pattern MAC_ADDRESS = Pattern.compile(RegexPool.MAC_ADDRESS, Pattern.CASE_INSENSITIVE);
+	/**
+	 * 16进制字符串
+	 */
+	public static final Pattern HEX = Pattern.compile(RegexPool.HEX);
+	/**
+	 * 时间正则
+	 */
+	public static final Pattern TIME = Pattern.compile(RegexPool.TIME);
+	/**
+	 * 中国车牌号码（兼容新能源车牌）
+	 */
+	public final static Pattern PLATE_NUMBER = Pattern.compile(RegexPool.PLATE_NUMBER);
+
+	/**
+	 * 统一社会信用代码
+	 * <pre>
+	 * 第一部分：登记管理部门代码1位 (数字或大写英文字母)
+	 * 第二部分：机构类别代码1位 (数字或大写英文字母)
+	 * 第三部分：登记管理机关行政区划码6位 (数字)
+	 * 第四部分：主体标识码（组织机构代码）9位 (数字或大写英文字母)
+	 * 第五部分：校验码1位 (数字或大写英文字母)
+	 * </pre>
+	 */
+	public static final Pattern CREDIT_CODE = Pattern.compile(RegexPool.CREDIT_CODE);
+	/**
+	 * 车架号（车辆识别代号由世界制造厂识别代号(WMI、车辆说明部分(VDS)车辆指示部分(VIS)三部分组成，共 17 位字码。）<br>
+	 * 别名：车辆识别代号、车辆识别码、车架号、十七位码<br>
+	 * 标准号：GB 16735-2019<br>
+	 * 标准官方地址：https://openstd.samr.gov.cn/bzgk/gb/newGbInfo?hcno=E2EBF667F8C032B1EDFD6DF9C1114E02
+	 * 对年产量大于或等于1 000 辆的完整车辆和/或非完整车辆制造厂：
+	 * <pre>
+	 *   第一部分为世界制造厂识别代号(WMI)，3位
+	 *   第二部分为车辆说明部分(VDS)，     6位
+	 *   第三部分为车辆指示部分(VIS)，     8位
+	 * </pre>
+	 *
+	 * 对年产量小于 1 000 辆的完整车辆和/或非完整车辆制造厂：
+	 * <pre>
+	 *   第一部分为世界制造广识别代号(WMI),3位;
+	 *   第二部分为车辆说明部分(VDS)，6位;
+	 *   第三部分的三、四、五位与第一部分的三位字码起构成世界制造厂识别代号(WMI),其余五位为车辆指示部分(VIS)，8位。
+	 * </pre>
+	 *
+	 * <pre>
+	 *   eg:LDC613P23A1305189
+	 *   eg:LSJA24U62JG269225
+	 *   eg:LBV5S3102ESJ25655
+	 * </pre>
+	 */
+	public static final Pattern CAR_VIN = Pattern.compile(RegexPool.CAR_VIN);
+	/**
+	 * 驾驶证  别名：驾驶证档案编号、行驶证编号
+	 * eg:430101758218
+	 * 12位数字字符串
+	 * 仅限：中国驾驶证档案编号
+	 */
+	public static final Pattern CAR_DRIVING_LICENCE = Pattern.compile(RegexPool.CAR_DRIVING_LICENCE);
+	/**
+	 * 中文姓名
+	 * 总结中国人姓名：2-60位，只能是中文和 ·
+	 */
+	public static final Pattern CHINESE_NAME = Pattern.compile(RegexPool.CHINESE_NAME);
 
 	// -------------------------------------------------------------------------------------------------------------------------------------------------------------------
-	/** Pattern池 */
-	private static final SimpleCache<RegexWithFlag, Pattern> POOL = new SimpleCache<>();
+	/**
+	 * Pattern池
+	 */
+	private static final WeakConcurrentMap<RegexWithFlag, Pattern> POOL = new WeakConcurrentMap<>();
 
 	/**
 	 * 先从Pattern池中查找正则对应的{@link Pattern}，找不到则编译正则表达式并入池。
-	 * 
+	 *
 	 * @param regex 正则表达式
 	 * @return {@link Pattern}
 	 */
@@ -76,25 +212,19 @@ public class PatternPool {
 
 	/**
 	 * 先从Pattern池中查找正则对应的{@link Pattern}，找不到则编译正则表达式并入池。
-	 * 
+	 *
 	 * @param regex 正则表达式
 	 * @param flags 正则标识位集合 {@link Pattern}
 	 * @return {@link Pattern}
 	 */
 	public static Pattern get(String regex, int flags) {
 		final RegexWithFlag regexWithFlag = new RegexWithFlag(regex, flags);
-
-		Pattern pattern = POOL.get(regexWithFlag);
-		if (null == pattern) {
-			pattern = Pattern.compile(regex, flags);
-			POOL.put(regexWithFlag, pattern);
-		}
-		return pattern;
+		return POOL.computeIfAbsent(regexWithFlag, (key)-> Pattern.compile(regex, flags));
 	}
 
 	/**
 	 * 移除缓存
-	 * 
+	 *
 	 * @param regex 正则
 	 * @param flags 标识
 	 * @return 移除的{@link Pattern}，可能为{@code null}
@@ -111,21 +241,21 @@ public class PatternPool {
 	}
 
 	// ---------------------------------------------------------------------------------------------------------------------------------
+
 	/**
 	 * 正则表达式和正则标识位的包装
-	 * 
-	 * @author Looly
 	 *
+	 * @author Looly
 	 */
 	private static class RegexWithFlag {
-		private String regex;
-		private int flag;
+		private final String regex;
+		private final int flag;
 
 		/**
 		 * 构造
-		 * 
+		 *
 		 * @param regex 正则
-		 * @param flag 标识
+		 * @param flag  标识
 		 */
 		public RegexWithFlag(String regex, int flag) {
 			this.regex = regex;

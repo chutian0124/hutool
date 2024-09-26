@@ -1,16 +1,17 @@
 package cn.hutool.cron;
 
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.cron.pattern.CronPattern;
+import cn.hutool.cron.task.CronTask;
+import cn.hutool.cron.task.Task;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.TimeZone;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import cn.hutool.cron.pattern.CronPattern;
-import cn.hutool.cron.task.Task;
 
 /**
  * 定时任务表<br>
@@ -22,24 +23,33 @@ import cn.hutool.cron.task.Task;
 public class TaskTable implements Serializable {
 	private static final long serialVersionUID = 1L;
 
-	private ReadWriteLock lock = new ReentrantReadWriteLock();
+	public static final int DEFAULT_CAPACITY = 10;
 
-	private Scheduler scheduler;
-	private TimeZone timezone;
+	private final ReadWriteLock lock;
 
-	private List<String> ids = new ArrayList<>();
-	private List<CronPattern> patterns = new ArrayList<>();
-	private List<Task> tasks = new ArrayList<>();
+	private final List<String> ids;
+	private final List<CronPattern> patterns;
+	private final List<Task> tasks;
 	private int size;
 
 	/**
 	 * 构造
-	 *
-	 * @param scheduler {@link Scheduler}
 	 */
-	public TaskTable(Scheduler scheduler) {
-		this.scheduler = scheduler;
-		this.timezone = scheduler.getTimeZone();
+	public TaskTable() {
+		this(DEFAULT_CAPACITY);
+	}
+
+	/**
+	 * 构造
+	 *
+	 * @param initialCapacity 容量，即预估的最大任务数
+	 */
+	public TaskTable(int initialCapacity) {
+		lock = new ReentrantReadWriteLock();
+
+		ids = new ArrayList<>(initialCapacity);
+		patterns = new ArrayList<>(initialCapacity);
+		tasks = new ArrayList<>(initialCapacity);
 	}
 
 	/**
@@ -52,8 +62,8 @@ public class TaskTable implements Serializable {
 	 */
 	public TaskTable add(String id, CronPattern pattern, Task task) {
 		final Lock writeLock = lock.writeLock();
+		writeLock.lock();
 		try {
-			writeLock.lock();
 			if (ids.contains(id)) {
 				throw new CronException("Id [{}] has been existed!", id);
 			}
@@ -75,8 +85,8 @@ public class TaskTable implements Serializable {
 	 */
 	public List<String> getIds() {
 		final Lock readLock = lock.readLock();
+		readLock.lock();
 		try {
-			readLock.lock();
 			return Collections.unmodifiableList(this.ids);
 		} finally {
 			readLock.unlock();
@@ -91,8 +101,8 @@ public class TaskTable implements Serializable {
 	 */
 	public List<CronPattern> getPatterns() {
 		final Lock readLock = lock.readLock();
+		readLock.lock();
 		try {
-			readLock.lock();
 			return Collections.unmodifiableList(this.patterns);
 		} finally {
 			readLock.unlock();
@@ -107,8 +117,8 @@ public class TaskTable implements Serializable {
 	 */
 	public List<Task> getTasks() {
 		final Lock readLock = lock.readLock();
+		readLock.lock();
 		try {
-			readLock.lock();
 			return Collections.unmodifiableList(this.tasks);
 		} finally {
 			readLock.unlock();
@@ -119,21 +129,24 @@ public class TaskTable implements Serializable {
 	 * 移除Task
 	 *
 	 * @param id Task的ID
+	 * @return 是否成功移除，{@code false}表示未找到对应ID的任务
 	 */
-	public void remove(String id) {
+	public boolean remove(String id) {
 		final Lock writeLock = lock.writeLock();
+		writeLock.lock();
 		try {
-			writeLock.lock();
 			final int index = ids.indexOf(id);
-			if (index > -1) {
-				tasks.remove(index);
-				patterns.remove(index);
-				ids.remove(index);
-				size--;
+			if (index < 0) {
+				return false;
 			}
+			tasks.remove(index);
+			patterns.remove(index);
+			ids.remove(index);
+			size--;
 		} finally {
 			writeLock.unlock();
 		}
+		return true;
 	}
 
 	/**
@@ -146,8 +159,8 @@ public class TaskTable implements Serializable {
 	 */
 	public boolean updatePattern(String id, CronPattern pattern) {
 		final Lock writeLock = lock.writeLock();
+		writeLock.lock();
 		try {
-			writeLock.lock();
 			final int index = ids.indexOf(id);
 			if (index > -1) {
 				patterns.set(index, pattern);
@@ -168,8 +181,8 @@ public class TaskTable implements Serializable {
 	 */
 	public Task getTask(int index) {
 		final Lock readLock = lock.readLock();
+		readLock.lock();
 		try {
-			readLock.lock();
 			return tasks.get(index);
 		} finally {
 			readLock.unlock();
@@ -200,8 +213,8 @@ public class TaskTable implements Serializable {
 	 */
 	public CronPattern getPattern(int index) {
 		final Lock readLock = lock.readLock();
+		readLock.lock();
 		try {
-			readLock.lock();
 			return patterns.get(index);
 		} finally {
 			readLock.unlock();
@@ -246,28 +259,40 @@ public class TaskTable implements Serializable {
 	/**
 	 * 如果时间匹配则执行相应的Task，带读锁
 	 *
+	 * @param scheduler {@link Scheduler}
 	 * @param millis 时间毫秒
 	 */
-	public void executeTaskIfMatch(long millis) {
+	public void executeTaskIfMatch(Scheduler scheduler, long millis) {
 		final Lock readLock = lock.readLock();
+		readLock.lock();
 		try {
-			readLock.lock();
-			executeTaskIfMatchInternal(millis);
+			executeTaskIfMatchInternal(scheduler, millis);
 		} finally {
 			readLock.unlock();
 		}
 	}
 
+	@Override
+	public String toString() {
+		final StringBuilder builder = StrUtil.builder();
+		for (int i = 0; i < size; i++) {
+			builder.append(StrUtil.format("[{}] [{}] [{}]\n",
+					ids.get(i), patterns.get(i), tasks.get(i)));
+		}
+		return builder.toString();
+	}
+
 	/**
 	 * 如果时间匹配则执行相应的Task，无锁
 	 *
+	 * @param scheduler {@link Scheduler}
 	 * @param millis 时间毫秒
 	 * @since 3.1.1
 	 */
-	protected void executeTaskIfMatchInternal(long millis) {
+	protected void executeTaskIfMatchInternal(Scheduler scheduler, long millis) {
 		for (int i = 0; i < size; i++) {
-			if (patterns.get(i).match(timezone, millis, this.scheduler.matchSecond)) {
-				this.scheduler.taskExecutorManager.spawnExecutor(tasks.get(i));
+			if (patterns.get(i).match(scheduler.config.timezone, millis, scheduler.config.matchSecond)) {
+				scheduler.taskExecutorManager.spawnExecutor(new CronTask(ids.get(i), patterns.get(i), tasks.get(i)));
 			}
 		}
 	}

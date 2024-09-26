@@ -1,14 +1,12 @@
 package cn.hutool.extra.emoji;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
-
 import com.vdurmont.emoji.Emoji;
 import com.vdurmont.emoji.EmojiManager;
 import com.vdurmont.emoji.EmojiParser;
-import com.vdurmont.emoji.EmojiTrie;
 import com.vdurmont.emoji.EmojiParser.FitzpatrickAction;
+
+import java.util.List;
+import java.util.Set;
 
 /**
  * 基于https://github.com/vdurmont/emoji-java的Emoji表情工具类
@@ -38,22 +36,7 @@ public class EmojiUtil {
 	 * @since 4.5.11
 	 */
 	public static boolean containsEmoji(String str) {
-		if (str == null) {
-			return false;
-		}
-		final char[] chars = str.toCharArray();
-		EmojiTrie.Matches status;
-		for (int i = 0; i < chars.length; i++) {
-			for (int j = i + 1; j <= chars.length; j++) {
-				status = EmojiManager.isEmoji(Arrays.copyOfRange(chars, i, j));
-				if (status.impossibleMatch()) {
-					break;
-				} else if (status.exactMatch()) {
-					return true;
-				}
-			}
-		}
-		return false;
+		return EmojiManager.containsEmoji(str);
 	}
 
 	/**
@@ -143,11 +126,11 @@ public class EmojiUtil {
 	 * @return 替换后的字符串
 	 */
 	public static String toHtmlHex(String str) {
-		return EmojiParser.parseToHtmlHexadecimal(str);
+		return toHtml(str, true);
 	}
 
 	/**
-	 * 将字符串中的Unicode Emoji字符转换为HTML表现形式
+	 * 将字符串中的Unicode Emoji字符转换为HTML表现形式（Hex方式）
 	 * <p>
 	 * 例如：<code>👦🏿</code> 转换为 <code>&amp;#128102;</code>
 	 *
@@ -155,7 +138,24 @@ public class EmojiUtil {
 	 * @return 替换后的字符串
 	 */
 	public static String toHtml(String str) {
-		return EmojiParser.parseToHtmlHexadecimal(str);
+		return toHtml(str, false);
+	}
+
+	/**
+	 * 将字符串中的Unicode Emoji字符转换为HTML表现形式，例如：
+	 * <pre>
+	 * 如果为hex形式，<code>👦🏿</code> 转换为 <code>&amp;#x1f466;</code>
+	 * 否则，<code>👦🏿</code> 转换为 <code>&amp;#128102;</code>
+	 * </pre>
+	 *
+	 * @param str   包含Emoji Unicode字符的字符串
+	 * @param isHex 是否hex形式
+	 * @return 替换后的字符串
+	 * @since 5.7.21
+	 */
+	public static String toHtml(String str, boolean isHex) {
+		return isHex ? EmojiParser.parseToHtmlHexadecimal(str) :
+				EmojiParser.parseToHtmlDecimal(str);
 	}
 
 	/**

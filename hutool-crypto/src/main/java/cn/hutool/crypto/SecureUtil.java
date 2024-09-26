@@ -3,10 +3,7 @@ package cn.hutool.crypto;
 import cn.hutool.core.codec.Base64;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.lang.Validator;
-import cn.hutool.core.map.MapUtil;
-import cn.hutool.core.util.HexUtil;
-import cn.hutool.core.util.IdUtil;
-import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.util.*;
 import cn.hutool.crypto.asymmetric.AsymmetricAlgorithm;
 import cn.hutool.crypto.asymmetric.RSA;
 import cn.hutool.crypto.asymmetric.Sign;
@@ -19,8 +16,12 @@ import cn.hutool.crypto.digest.MD5;
 import cn.hutool.crypto.symmetric.AES;
 import cn.hutool.crypto.symmetric.DES;
 import cn.hutool.crypto.symmetric.DESede;
+import cn.hutool.crypto.symmetric.PBKDF2;
 import cn.hutool.crypto.symmetric.RC4;
 import cn.hutool.crypto.symmetric.SymmetricCrypto;
+import cn.hutool.crypto.symmetric.ZUC;
+import cn.hutool.crypto.symmetric.fpe.FPE;
+import org.bouncycastle.crypto.AlphabetMapper;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
@@ -48,9 +49,12 @@ import java.util.Map;
  * 2、非对称加密（asymmetric），例如：RSA、DSA等<br>
  * 3、摘要加密（digest），例如：MD5、SHA-1、SHA-256、HMAC等<br>
  *
- * @author xiaoleilu, Gsealy
+ * @author Looly, Gsealy
  */
-public final class SecureUtil {
+public class SecureUtil {
+
+	/** Hutool自定义系统属性：是否解码Hex字符 issue#I90M9D */
+	public static String HUTOOL_CRYPTO_DECODE_HEX = "hutool.crypto.decodeHex";
 
 	/**
 	 * 默认密钥字节数
@@ -626,23 +630,26 @@ public final class SecureUtil {
 	 * 创建HMac对象，调用digest方法可获得hmac值
 	 *
 	 * @param algorithm {@link HmacAlgorithm}
-	 * @param key       密钥，如果为<code>null</code>生成随机密钥
+	 * @param key       密钥，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 * @since 3.3.0
 	 */
 	public static HMac hmac(HmacAlgorithm algorithm, String key) {
-		return new HMac(algorithm, StrUtil.utf8Bytes(key));
+		return hmac(algorithm, StrUtil.isNotEmpty(key)? StrUtil.utf8Bytes(key): null);
 	}
 
 	/**
 	 * 创建HMac对象，调用digest方法可获得hmac值
 	 *
 	 * @param algorithm {@link HmacAlgorithm}
-	 * @param key       密钥，如果为<code>null</code>生成随机密钥
+	 * @param key       密钥，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 * @since 3.0.3
 	 */
 	public static HMac hmac(HmacAlgorithm algorithm, byte[] key) {
+		if (ArrayUtil.isEmpty(key)) {
+			key = generateKey(algorithm.getValue()).getEncoded();
+		}
 		return new HMac(algorithm, key);
 	}
 
@@ -650,11 +657,14 @@ public final class SecureUtil {
 	 * 创建HMac对象，调用digest方法可获得hmac值
 	 *
 	 * @param algorithm {@link HmacAlgorithm}
-	 * @param key       密钥{@link SecretKey}，如果为<code>null</code>生成随机密钥
+	 * @param key       密钥{@link SecretKey}，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 * @since 3.0.3
 	 */
 	public static HMac hmac(HmacAlgorithm algorithm, SecretKey key) {
+		if (ObjectUtil.isNull(key)) {
+			key = generateKey(algorithm.getValue());
+		}
 		return new HMac(algorithm, key);
 	}
 
@@ -664,12 +674,12 @@ public final class SecureUtil {
 	 * HmacMD5加密：hmacMd5(key).digest(data)<br>
 	 * HmacMD5加密并转为16进制字符串：hmacMd5(key).digestHex(data)<br>
 	 *
-	 * @param key 加密密钥，如果为<code>null</code>生成随机密钥
+	 * @param key 加密密钥，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 * @since 3.3.0
 	 */
 	public static HMac hmacMd5(String key) {
-		return hmacMd5(StrUtil.utf8Bytes(key));
+		return hmacMd5(StrUtil.isNotEmpty(key)? StrUtil.utf8Bytes(key): null);
 	}
 
 	/**
@@ -678,10 +688,13 @@ public final class SecureUtil {
 	 * HmacMD5加密：hmacMd5(key).digest(data)<br>
 	 * HmacMD5加密并转为16进制字符串：hmacMd5(key).digestHex(data)<br>
 	 *
-	 * @param key 加密密钥，如果为<code>null</code>生成随机密钥
+	 * @param key 加密密钥，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 */
 	public static HMac hmacMd5(byte[] key) {
+		if (ArrayUtil.isEmpty(key)) {
+			key = generateKey(HmacAlgorithm.HmacMD5.getValue()).getEncoded();
+		}
 		return new HMac(HmacAlgorithm.HmacMD5, key);
 	}
 
@@ -703,12 +716,12 @@ public final class SecureUtil {
 	 * HmacSHA1加密：hmacSha1(key).digest(data)<br>
 	 * HmacSHA1加密并转为16进制字符串：hmacSha1(key).digestHex(data)<br>
 	 *
-	 * @param key 加密密钥，如果为<code>null</code>生成随机密钥
+	 * @param key 加密密钥，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 * @since 3.3.0
 	 */
 	public static HMac hmacSha1(String key) {
-		return hmacSha1(StrUtil.utf8Bytes(key));
+		return hmacSha1(StrUtil.isNotEmpty(key)? StrUtil.utf8Bytes(key): null);
 	}
 
 	/**
@@ -717,10 +730,13 @@ public final class SecureUtil {
 	 * HmacSHA1加密：hmacSha1(key).digest(data)<br>
 	 * HmacSHA1加密并转为16进制字符串：hmacSha1(key).digestHex(data)<br>
 	 *
-	 * @param key 加密密钥，如果为<code>null</code>生成随机密钥
+	 * @param key 加密密钥，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 */
 	public static HMac hmacSha1(byte[] key) {
+		if (ArrayUtil.isEmpty(key)) {
+			key = generateKey(HmacAlgorithm.HmacMD5.getValue()).getEncoded();
+		}
 		return new HMac(HmacAlgorithm.HmacSHA1, key);
 	}
 
@@ -734,6 +750,50 @@ public final class SecureUtil {
 	 */
 	public static HMac hmacSha1() {
 		return new HMac(HmacAlgorithm.HmacSHA1);
+	}
+
+	/**
+	 * HmacSHA256加密器<br>
+	 * 例：<br>
+	 * HmacSHA256加密：hmacSha256(key).digest(data)<br>
+	 * HmacSHA256加密并转为16进制字符串：hmacSha256(key).digestHex(data)<br>
+	 *
+	 * @param key 加密密钥，如果为{@code null}生成随机密钥
+	 * @return {@link HMac}
+	 * @since 5.6.0
+	 */
+	public static HMac hmacSha256(String key) {
+		return hmacSha256(StrUtil.isNotEmpty(key)? StrUtil.utf8Bytes(key): null);
+	}
+
+	/**
+	 * HmacSHA256加密器<br>
+	 * 例：<br>
+	 * HmacSHA256加密：hmacSha256(key).digest(data)<br>
+	 * HmacSHA256加密并转为16进制字符串：hmacSha256(key).digestHex(data)<br>
+	 *
+	 * @param key 加密密钥，如果为{@code null}生成随机密钥
+	 * @return {@link HMac}
+	 * @since 5.6.0
+	 */
+	public static HMac hmacSha256(byte[] key) {
+		if (ArrayUtil.isEmpty(key)) {
+			key = generateKey(HmacAlgorithm.HmacMD5.getValue()).getEncoded();
+		}
+		return new HMac(HmacAlgorithm.HmacSHA256, key);
+	}
+
+	/**
+	 * HmacSHA256加密器，生成随机KEY<br>
+	 * 例：<br>
+	 * HmacSHA256加密：hmacSha256().digest(data)<br>
+	 * HmacSHA256加密并转为16进制字符串：hmacSha256().digestHex(data)<br>
+	 *
+	 * @return {@link HMac}
+	 * @since 5.6.0
+	 */
+	public static HMac hmacSha256() {
+		return new HMac(HmacAlgorithm.HmacSHA256);
 	}
 
 	// ------------------------------------------------------------------- 非称加密算法
@@ -786,7 +846,7 @@ public final class SecureUtil {
 	 * @since 3.3.0
 	 */
 	public static Sign sign(SignAlgorithm algorithm) {
-		return new Sign(algorithm);
+		return SignUtil.sign(algorithm);
 	}
 
 	/**
@@ -801,7 +861,7 @@ public final class SecureUtil {
 	 * @since 3.3.0
 	 */
 	public static Sign sign(SignAlgorithm algorithm, String privateKeyBase64, String publicKeyBase64) {
-		return new Sign(algorithm, privateKeyBase64, publicKeyBase64);
+		return SignUtil.sign(algorithm, privateKeyBase64, publicKeyBase64);
 	}
 
 	/**
@@ -816,7 +876,7 @@ public final class SecureUtil {
 	 * @since 3.3.0
 	 */
 	public static Sign sign(SignAlgorithm algorithm, byte[] privateKey, byte[] publicKey) {
-		return new Sign(algorithm, privateKey, publicKey);
+		return SignUtil.sign(algorithm, privateKey, publicKey);
 	}
 
 	/**
@@ -831,7 +891,7 @@ public final class SecureUtil {
 	 * @since 4.0.1
 	 */
 	public static String signParams(SymmetricCrypto crypto, Map<?, ?> params, String... otherParams) {
-		return signParams(crypto, params, StrUtil.EMPTY, StrUtil.EMPTY, true, otherParams);
+		return SignUtil.signParams(crypto, params, otherParams);
 	}
 
 	/**
@@ -848,8 +908,8 @@ public final class SecureUtil {
 	 * @since 4.0.1
 	 */
 	public static String signParams(SymmetricCrypto crypto, Map<?, ?> params, String separator,
-	                                String keyValueSeparator, boolean isIgnoreNull, String... otherParams) {
-		return crypto.encryptHex(MapUtil.sortJoin(params, separator, keyValueSeparator, isIgnoreNull, otherParams));
+									String keyValueSeparator, boolean isIgnoreNull, String... otherParams) {
+		return SignUtil.signParams(crypto, params, separator, keyValueSeparator, isIgnoreNull, otherParams);
 	}
 
 	/**
@@ -863,7 +923,7 @@ public final class SecureUtil {
 	 * @since 4.0.1
 	 */
 	public static String signParamsMd5(Map<?, ?> params, String... otherParams) {
-		return signParams(DigestAlgorithm.MD5, params, otherParams);
+		return SignUtil.signParamsMd5(params, otherParams);
 	}
 
 	/**
@@ -877,7 +937,7 @@ public final class SecureUtil {
 	 * @since 4.0.8
 	 */
 	public static String signParamsSha1(Map<?, ?> params, String... otherParams) {
-		return signParams(DigestAlgorithm.SHA1, params, otherParams);
+		return SignUtil.signParamsSha1(params, otherParams);
 	}
 
 	/**
@@ -891,7 +951,7 @@ public final class SecureUtil {
 	 * @since 4.0.1
 	 */
 	public static String signParamsSha256(Map<?, ?> params, String... otherParams) {
-		return signParams(DigestAlgorithm.SHA256, params, otherParams);
+		return SignUtil.signParamsSha256(params, otherParams);
 	}
 
 	/**
@@ -906,7 +966,7 @@ public final class SecureUtil {
 	 * @since 4.0.1
 	 */
 	public static String signParams(DigestAlgorithm digestAlgorithm, Map<?, ?> params, String... otherParams) {
-		return signParams(digestAlgorithm, params, StrUtil.EMPTY, StrUtil.EMPTY, true, otherParams);
+		return SignUtil.signParams(digestAlgorithm, params, otherParams);
 	}
 
 	/**
@@ -923,21 +983,8 @@ public final class SecureUtil {
 	 * @since 4.0.1
 	 */
 	public static String signParams(DigestAlgorithm digestAlgorithm, Map<?, ?> params, String separator,
-	                                String keyValueSeparator, boolean isIgnoreNull, String... otherParams) {
-		return new Digester(digestAlgorithm).digestHex(MapUtil.sortJoin(params, separator, keyValueSeparator, isIgnoreNull, otherParams));
-	}
-
-	// ------------------------------------------------------------------- UUID
-
-	/**
-	 * 简化的UUID，去掉了横线
-	 *
-	 * @return 简化的UUID，去掉了横线
-	 * @deprecated 请使用 {@link IdUtil#simpleUUID()}
-	 */
-	@Deprecated
-	public static String simpleUUID() {
-		return IdUtil.simpleUUID();
+									String keyValueSeparator, boolean isIgnoreNull, String... otherParams) {
+		return SignUtil.signParams(digestAlgorithm, params, separator, keyValueSeparator, isIgnoreNull, otherParams);
 	}
 
 	/**
@@ -967,7 +1014,10 @@ public final class SecureUtil {
 	 * @since 4.3.3
 	 */
 	public static byte[] decode(String key) {
-		return Validator.isHex(key) ? HexUtil.decodeHex(key) : Base64.decode(key);
+		// issue#I90M9D
+		// 某些特殊字符串会无法区分Hex还是Base64，此处使用系统属性强制关闭Hex解析
+		final boolean decodeHex = SystemPropsUtil.getBoolean(HUTOOL_CRYPTO_DECODE_HEX, true);
+		return (decodeHex && Validator.isHex(key)) ? HexUtil.decodeHex(key) : Base64.decode(key);
 	}
 
 	/**
@@ -1011,6 +1061,20 @@ public final class SecureUtil {
 	}
 
 	/**
+	 * 创建{@link MessageDigest}，使用JDK默认的Provider<br>
+	 *
+	 * @param algorithm 算法
+	 * @return {@link MessageDigest}
+	 */
+	public static MessageDigest createJdkMessageDigest(final String algorithm) {
+		try {
+			return MessageDigest.getInstance(algorithm);
+		} catch (final NoSuchAlgorithmException e) {
+			throw new CryptoException(e);
+		}
+	}
+
+	/**
 	 * 创建{@link Mac}
 	 *
 	 * @param algorithm 算法
@@ -1031,6 +1095,26 @@ public final class SecureUtil {
 	}
 
 	/**
+	 * 创建{@link Signature}
+	 *
+	 * @param algorithm 算法
+	 * @return {@link Signature}
+	 * @since 5.7.0
+	 */
+	public static Signature createSignature(String algorithm) {
+		final Provider provider = GlobalBouncyCastleProvider.INSTANCE.getProvider();
+
+		Signature signature;
+		try {
+			signature = (null == provider) ? Signature.getInstance(algorithm) : Signature.getInstance(algorithm, provider);
+		} catch (NoSuchAlgorithmException e) {
+			throw new CryptoException(e);
+		}
+
+		return signature;
+	}
+
+	/**
 	 * RC4算法
 	 *
 	 * @param key 密钥
@@ -1047,5 +1131,55 @@ public final class SecureUtil {
 	 */
 	public static void disableBouncyCastle() {
 		GlobalBouncyCastleProvider.setUseBouncyCastle(false);
+	}
+
+	/**
+	 * PBKDF2加密密码
+	 *
+	 * @param password 密码
+	 * @param salt     盐
+	 * @return 盐，一般为16位
+	 * @since 5.6.0
+	 */
+	public static String pbkdf2(char[] password, byte[] salt) {
+		return new PBKDF2().encryptHex(password, salt);
+	}
+
+	/**
+	 * FPE(Format Preserving Encryption)实现，支持FF1和FF3-1模式。
+	 *
+	 * @param mode   FPE模式枚举，可选FF1或FF3-1
+	 * @param key    密钥，{@code null}表示随机密钥，长度必须是16bit、24bit或32bit
+	 * @param mapper Alphabet字典映射，被加密的字符范围和这个映射必须一致，例如手机号、银行卡号等字段可以采用数字字母字典表
+	 * @param tweak  Tweak是为了解决因局部加密而导致结果冲突问题，通常情况下将数据的不可变部分作为Tweak
+	 * @return {@link FPE}
+	 * @since 5.7.12
+	 */
+	public static FPE fpe(FPE.FPEMode mode, byte[] key, AlphabetMapper mapper, byte[] tweak) {
+		return new FPE(mode, key, mapper, tweak);
+	}
+
+	/**
+	 * 祖冲之算法集（ZUC-128算法）实现，基于BouncyCastle实现。
+	 *
+	 * @param key 密钥
+	 * @param iv  加盐，长度16bytes，{@code null}是随机加盐
+	 * @return {@link ZUC}
+	 * @since 5.7.12
+	 */
+	public static ZUC zuc128(byte[] key, byte[] iv) {
+		return new ZUC(ZUC.ZUCAlgorithm.ZUC_128, key, iv);
+	}
+
+	/**
+	 * 祖冲之算法集（ZUC-256算法）实现，基于BouncyCastle实现。
+	 *
+	 * @param key 密钥
+	 * @param iv  加盐，长度25bytes，{@code null}是随机加盐
+	 * @return {@link ZUC}
+	 * @since 5.7.12
+	 */
+	public static ZUC zuc256(byte[] key, byte[] iv) {
+		return new ZUC(ZUC.ZUCAlgorithm.ZUC_256, key, iv);
 	}
 }

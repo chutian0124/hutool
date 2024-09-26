@@ -1,13 +1,13 @@
 package cn.hutool.core.io;
 
+import cn.hutool.core.util.CharsetUtil;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
 
-import cn.hutool.core.util.CharsetUtil;
-
 /**
- * 读取带BOM头的流内容，<code>getCharset()</code>方法调用后会得到BOM头的编码，且会去除BOM头<br>
+ * 读取带BOM头的流内容，{@code getCharset()}方法调用后会得到BOM头的编码，且会去除BOM头<br>
  * BOM定义：http://www.unicode.org/unicode/faq/utf_bom.html<br>
  * <ul>
  * <li>00 00 FE FF = UTF-32, big-endian</li>
@@ -25,6 +25,8 @@ import cn.hutool.core.util.CharsetUtil;
  * </code>
  * <br><br>
  * 参考： http://akini.mbnet.fi/java/unicodereader/UnicodeInputStream.java.txt
+ *
+ * @author looly
  */
 public class BOMInputStream extends InputStream {
 
@@ -36,22 +38,43 @@ public class BOMInputStream extends InputStream {
 	private static final int BOM_SIZE = 4;
 
 	// ----------------------------------------------------------------- Constructor start
+
+	/**
+	 * 构造
+	 * @param in 流
+	 */
 	public BOMInputStream(InputStream in) {
 		this(in, CharsetUtil.UTF_8);
 	}
 
+	/**
+	 * 构造
+	 *
+	 * @param in 流
+	 * @param defaultCharset 默认编码
+	 */
 	public BOMInputStream(InputStream in, String defaultCharset) {
 		this.in = new PushbackInputStream(in, BOM_SIZE);
 		this.defaultCharset = defaultCharset;
 	}
 	// ----------------------------------------------------------------- Constructor end
 
+	/**
+	 * 获取默认编码
+	 *
+	 * @return 默认编码
+	 */
 	public String getDefaultCharset() {
 		return defaultCharset;
 	}
 
+	/**
+	 * 获取BOM头中的编码
+	 *
+	 * @return 编码
+	 */
 	public String getCharset() {
-		if (!isInited) {
+		if (false == isInited) {
 			try {
 				init();
 			} catch (IOException ex) {
@@ -107,7 +130,6 @@ public class BOMInputStream extends InputStream {
 			charset = defaultCharset;
 			unread = n;
 		}
-		// System.out.println("read=" + n + ", unread=" + unread);
 
 		if (unread > 0) {
 			in.unread(bom, (n - unread), unread);

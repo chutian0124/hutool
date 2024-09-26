@@ -1,19 +1,21 @@
 package cn.hutool.crypto.symmetric;
 
+import cn.hutool.core.codec.Base64;
+import cn.hutool.core.util.CharsetUtil;
+import cn.hutool.core.util.HexUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.CryptoException;
+import cn.hutool.crypto.SecureUtil;
+
 import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
-import cn.hutool.core.codec.Base64;
-import cn.hutool.core.util.CharsetUtil;
-import cn.hutool.core.util.HexUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.crypto.CryptoException;
-
 /**
  * RC4加密解密算法实现<br>
+ * 注意：由于安全问题，已经基本不在HTTPS中使用了<br>
  * 来自：https://github.com/xSAVIKx/RC4-cipher/blob/master/src/main/java/com/github/xsavikx/rc4/RC4.java
  *
  * @author Iurii Sergiichuk，Looly
@@ -27,12 +29,12 @@ public class RC4 implements Serializable {
 
 	/** Sbox */
 	private int[] sbox;
-	
+
 	private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param key 密钥
 	 * @throws CryptoException key长度小于5或者大于255抛出此异常
 	 */
@@ -62,10 +64,10 @@ public class RC4 implements Serializable {
 	public byte[] encrypt(String message) throws CryptoException {
 		return encrypt(message, CharsetUtil.CHARSET_UTF_8);
 	}
-	
+
 	/**
 	 * 加密
-	 * 
+	 *
 	 * @param data 数据
 	 * @return 加密后的Hex
 	 * @since 4.5.12
@@ -76,7 +78,7 @@ public class RC4 implements Serializable {
 
 	/**
 	 * 加密
-	 * 
+	 *
 	 * @param data 数据
 	 * @return 加密后的Base64
 	 * @since 4.5.12
@@ -84,10 +86,10 @@ public class RC4 implements Serializable {
 	public String encryptBase64(byte[] data) {
 		return Base64.encode(crypt(data));
 	}
-	
+
 	/**
 	 * 加密
-	 * 
+	 *
 	 * @param data 被加密的字符串
 	 * @param charset 编码
 	 * @return 加密后的Hex
@@ -98,8 +100,19 @@ public class RC4 implements Serializable {
 	}
 
 	/**
+	 * 加密，使用UTF-8编码
+	 *
+	 * @param data 被加密的字符串
+	 * @return 加密后的Hex
+	 * @since 5.4.4
+	 */
+	public String encryptHex(String data) {
+		return HexUtil.encodeHexStr(encrypt(data));
+	}
+
+	/**
 	 * 加密
-	 * 
+	 *
 	 * @param data 被加密的字符串
 	 * @param charset 编码
 	 * @return 加密后的Base64
@@ -107,6 +120,18 @@ public class RC4 implements Serializable {
 	 */
 	public String encryptBase64(String data, Charset charset) {
 		return Base64.encode(encrypt(data, charset));
+	}
+
+
+	/**
+	 * 加密，使用UTF-8编码
+	 *
+	 * @param data 被加密的字符串
+	 * @return 加密后的Base64
+	 * @since 5.4.4
+	 */
+	public String encryptBase64(String data) {
+		return Base64.encode(encrypt(data));
 	}
 
 	/**
@@ -133,6 +158,30 @@ public class RC4 implements Serializable {
 	}
 
 	/**
+	 * 解密Hex（16进制）或Base64表示的字符串，使用默认编码UTF-8
+	 *
+	 * @param message 消息
+	 * @return 明文
+	 * @since 5.4.4
+	 */
+	public String decrypt(String message) {
+		return decrypt(SecureUtil.decode(message));
+	}
+
+	/**
+	 * 解密Hex（16进制）或Base64表示的字符串
+	 *
+	 * @param message    明文
+	 * @param charset 解密后的charset
+	 * @return 明文
+	 * @since 5.4.4
+	 */
+	public String decrypt(String message, Charset charset) {
+		return StrUtil.str(decrypt(message), charset);
+	}
+
+
+	/**
 	 * 加密或解密指定值，调用此方法前需初始化密钥
 	 *
 	 * @param msg 要加密或解密的消息
@@ -140,8 +189,8 @@ public class RC4 implements Serializable {
 	 */
 	public byte[] crypt(final byte[] msg) {
 		final ReadLock readLock = this.lock.readLock();
-		readLock.lock();
 		byte[] code;
+		readLock.lock();
 		try {
 			final int[] sbox = this.sbox.clone();
 			code = new byte[msg.length];
@@ -205,7 +254,7 @@ public class RC4 implements Serializable {
 
 	/**
 	 * 交换指定两个位置的值
-	 * 
+	 *
 	 * @param i 位置1
 	 * @param j 位置2
 	 * @param sbox 数组

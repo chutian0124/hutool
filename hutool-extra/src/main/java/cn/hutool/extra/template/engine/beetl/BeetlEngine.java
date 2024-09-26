@@ -1,7 +1,9 @@
 package cn.hutool.extra.template.engine.beetl;
 
-import java.io.IOException;
-
+import cn.hutool.core.io.IORuntimeException;
+import cn.hutool.extra.template.Template;
+import cn.hutool.extra.template.TemplateConfig;
+import cn.hutool.extra.template.TemplateEngine;
 import org.beetl.core.Configuration;
 import org.beetl.core.GroupTemplate;
 import org.beetl.core.ResourceLoader;
@@ -11,61 +13,84 @@ import org.beetl.core.resource.FileResourceLoader;
 import org.beetl.core.resource.StringTemplateResourceLoader;
 import org.beetl.core.resource.WebAppResourceLoader;
 
-import cn.hutool.core.io.IORuntimeException;
-import cn.hutool.extra.template.Template;
-import cn.hutool.extra.template.TemplateConfig;
-import cn.hutool.extra.template.TemplateEngine;
+import java.io.IOException;
 
 /**
  * Beetl模板引擎封装
- * 
+ *
  * @author looly
  */
 public class BeetlEngine implements TemplateEngine {
 
-	private final GroupTemplate engine;
+	private GroupTemplate engine;
 
 	// --------------------------------------------------------------------------------- Constructor start
 	/**
 	 * 默认构造
 	 */
-	public BeetlEngine() {
-		this(new TemplateConfig());
-	}
+	public BeetlEngine() {}
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param config 模板配置
 	 */
 	public BeetlEngine(TemplateConfig config) {
-		this(createEngine(config));
+		init(config);
 	}
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param engine {@link GroupTemplate}
 	 */
 	public BeetlEngine(GroupTemplate engine) {
-		this.engine = engine;
+		init(engine);
 	}
 	// --------------------------------------------------------------------------------- Constructor end
-	
+
+
+	@Override
+	public TemplateEngine init(TemplateConfig config) {
+		init(createEngine(config));
+		return this;
+	}
+
+	/**
+	 * 初始化引擎
+	 * @param engine 引擎
+	 */
+	private void init(GroupTemplate engine){
+		this.engine = engine;
+	}
+
 	@Override
 	public Template getTemplate(String resource) {
+		if(null == this.engine){
+			init(TemplateConfig.DEFAULT);
+		}
 		return BeetlTemplate.wrap(engine.getTemplate(resource));
 	}
 
 	/**
+	 * 获取原始引擎的钩子方法，用于自定义特殊属性，如插件等
+	 *
+	 * @return {@link GroupTemplate}
+	 * @since 5.8.7
+	 */
+	public GroupTemplate getRawEngine() {
+		return this.engine;
+	}
+
+	/**
 	 * 创建引擎
-	 * 
+	 *
 	 * @param config 模板配置
 	 * @return {@link GroupTemplate}
 	 */
 	private static GroupTemplate createEngine(TemplateConfig config) {
 		if (null == config) {
-			config = new TemplateConfig();
+			config = TemplateConfig.DEFAULT;
 		}
 
 		switch (config.getResourceMode()) {
@@ -88,12 +113,12 @@ public class BeetlEngine implements TemplateEngine {
 	/**
 	 * 创建自定义的模板组 {@link GroupTemplate}，配置文件使用全局默认<br>
 	 * 此时自定义的配置文件可在ClassPath中放入beetl.properties配置
-	 * 
+	 *
 	 * @param loader {@link ResourceLoader}，资源加载器
 	 * @return {@link GroupTemplate}
 	 * @since 3.2.0
 	 */
-	private static GroupTemplate createGroupTemplate(ResourceLoader loader) {
+	private static GroupTemplate createGroupTemplate(ResourceLoader<?> loader) {
 		try {
 			return createGroupTemplate(loader, Configuration.defaultConfiguration());
 		} catch (IOException e) {
@@ -103,12 +128,12 @@ public class BeetlEngine implements TemplateEngine {
 
 	/**
 	 * 创建自定义的 {@link GroupTemplate}
-	 * 
+	 *
 	 * @param loader {@link ResourceLoader}，资源加载器
 	 * @param conf {@link Configuration} 配置文件
 	 * @return {@link GroupTemplate}
 	 */
-	private static GroupTemplate createGroupTemplate(ResourceLoader loader, Configuration conf) {
+	private static GroupTemplate createGroupTemplate(ResourceLoader<?> loader, Configuration conf) {
 		return new GroupTemplate(loader, conf);
 	}
 }

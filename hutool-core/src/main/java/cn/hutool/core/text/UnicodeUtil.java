@@ -25,7 +25,7 @@ public class UnicodeUtil {
 		}
 
 		final int len = unicode.length();
-		StrBuilder sb = StrBuilder.create(len);
+		StringBuilder sb = new StringBuilder(len);
 		int i;
 		int pos = 0;
 		while ((i = StrUtil.indexOfIgnoreCase(unicode, "\\u", pos)) != -1) {
@@ -43,7 +43,7 @@ public class UnicodeUtil {
 					pos = i + 2;
 				}
 			} else {
-				pos = i;//非Unicode符，结束
+				//非Unicode符，结束
 				break;
 			}
 		}
@@ -52,6 +52,30 @@ public class UnicodeUtil {
 			sb.append(unicode, pos, len);
 		}
 		return sb.toString();
+	}
+
+	/**
+	 * 字符编码为Unicode形式
+	 *
+	 * @param c 被编码的字符
+	 * @return Unicode字符串
+	 * @since 5.6.2
+	 * @see HexUtil#toUnicodeHex(char)
+	 */
+	public static String toUnicode(char c) {
+		return HexUtil.toUnicodeHex(c);
+	}
+
+	/**
+	 * 字符编码为Unicode形式
+	 *
+	 * @param c 被编码的字符
+	 * @return Unicode字符串
+	 * @since 5.6.2
+	 * @see HexUtil#toUnicodeHex(int)
+	 */
+	public static String toUnicode(int c) {
+		return HexUtil.toUnicodeHex(c);
 	}
 
 	/**
@@ -77,7 +101,7 @@ public class UnicodeUtil {
 		}
 
 		final int len = str.length();
-		final StrBuilder unicode = StrBuilder.create(str.length() * 6);
+		final StringBuilder unicode = new StringBuilder(str.length() * 6);
 		char c;
 		for (int i = 0; i < len; i++) {
 			c = str.charAt(i);

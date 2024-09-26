@@ -1,10 +1,25 @@
 package cn.hutool.core.io.file;
 
+import cn.hutool.core.date.DateUnit;
+import cn.hutool.core.exceptions.UtilException;
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.io.IORuntimeException;
+import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.io.LineHandler;
+import cn.hutool.core.io.watch.SimpleWatcher;
+import cn.hutool.core.io.watch.WatchKind;
+import cn.hutool.core.io.watch.WatchMonitor;
+import cn.hutool.core.lang.Console;
+import cn.hutool.core.util.CharUtil;
+import cn.hutool.core.util.CharsetUtil;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.io.Serializable;
 import java.nio.charset.Charset;
+import java.nio.file.Path;
+import java.nio.file.WatchEvent;
 import java.util.Stack;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -12,18 +27,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import cn.hutool.core.date.DateUnit;
-import cn.hutool.core.exceptions.UtilException;
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.io.IORuntimeException;
-import cn.hutool.core.io.LineHandler;
-import cn.hutool.core.lang.Console;
-import cn.hutool.core.util.CharUtil;
-import cn.hutool.core.util.CharsetUtil;
-
 /**
  * 文件内容跟随器，实现类似Linux下"tail -f"命令功能
- * 
+ *
  * @author looly
  * @since 4.5.2
  */
@@ -33,20 +39,23 @@ public class Tailer implements Serializable {
 	public static final LineHandler CONSOLE_HANDLER = new ConsoleLineHandler();
 
 	/** 编码 */
-	private Charset charset;
+	private final Charset charset;
 	/** 行处理器 */
-	private LineHandler lineHandler;
+	private final LineHandler lineHandler;
 	/** 初始读取的行数 */
-	private int initReadLine;
+	private final int initReadLine;
 	/** 定时任务检查间隔时长 */
-	private long period;
+	private final long period;
 
-	private RandomAccessFile randomAccessFile;
-	private ScheduledExecutorService executorService;
+	private final String filePath;
+	private final RandomAccessFile randomAccessFile;
+	private final ScheduledExecutorService executorService;
+	private WatchMonitor fileDeleteWatchMonitor;
+	private boolean stopOnDelete;
 
 	/**
 	 * 构造，默认UTF-8编码
-	 * 
+	 *
 	 * @param file 文件
 	 * @param lineHandler 行处理器
 	 */
@@ -56,10 +65,10 @@ public class Tailer implements Serializable {
 
 	/**
 	 * 构造，默认UTF-8编码
-	 * 
+	 *
 	 * @param file 文件
 	 * @param lineHandler 行处理器
-	 * @param initReadLine 启动时预读取的行数
+	 * @param initReadLine 启动时预读取的行数，1表示一行
 	 */
 	public Tailer(File file, LineHandler lineHandler, int initReadLine) {
 		this(file, CharsetUtil.CHARSET_UTF_8, lineHandler, initReadLine, DateUnit.SECOND.getMillis());
@@ -67,7 +76,7 @@ public class Tailer implements Serializable {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param file 文件
 	 * @param charset 编码
 	 * @param lineHandler 行处理器
@@ -78,11 +87,11 @@ public class Tailer implements Serializable {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param file 文件
 	 * @param charset 编码
 	 * @param lineHandler 行处理器
-	 * @param initReadLine 启动时预读取的行数
+	 * @param initReadLine 启动时预读取的行数，1表示一行
 	 * @param period 检查间隔
 	 */
 	public Tailer(File file, Charset charset, LineHandler lineHandler, int initReadLine, long period) {
@@ -93,6 +102,16 @@ public class Tailer implements Serializable {
 		this.initReadLine = initReadLine;
 		this.randomAccessFile = FileUtil.createRandomAccessFile(file, FileMode.r);
 		this.executorService = Executors.newSingleThreadScheduledExecutor();
+		this.filePath=file.getAbsolutePath();
+	}
+
+	/**
+	 * 设置删除文件后是否退出并抛出异常
+	 *
+	 * @param stopOnDelete 删除文件后是否退出并抛出异常
+	 */
+	public void setStopOnDelete(final boolean stopOnDelete) {
+		this.stopOnDelete = stopOnDelete;
 	}
 
 	/**
@@ -104,7 +123,7 @@ public class Tailer implements Serializable {
 
 	/**
 	 * 开始监听
-	 * 
+	 *
 	 * @param async 是否异步执行
 	 */
 	public void start(boolean async) {
@@ -122,6 +141,20 @@ public class Tailer implements Serializable {
 				this.period, TimeUnit.MILLISECONDS//
 		);
 
+		// 监听删除
+		if(stopOnDelete){
+			fileDeleteWatchMonitor = WatchMonitor.create(this.filePath, WatchKind.DELETE.getValue());
+			fileDeleteWatchMonitor.setWatcher(new SimpleWatcher(){
+				@Override
+				public void onDelete(final WatchEvent<?> event, final Path currentPath) {
+					super.onDelete(event, currentPath);
+					stop();
+					throw new IORuntimeException("{} has been deleted", filePath);
+				}
+			});
+			fileDeleteWatchMonitor.start();
+		}
+
 		if (false == async) {
 			try {
 				scheduledFuture.get();
@@ -133,10 +166,22 @@ public class Tailer implements Serializable {
 		}
 	}
 
+	/**
+	 * 结束，此方法需在异步模式或
+	 */
+	public void stop(){
+		try{
+			this.executorService.shutdown();
+		}finally {
+			IoUtil.close(this.randomAccessFile);
+			IoUtil.close(this.fileDeleteWatchMonitor);
+		}
+	}
+
 	// ---------------------------------------------------------------------------------------- Private method start
 	/**
 	 * 预读取行
-	 * 
+	 *
 	 * @throws IOException IO异常
 	 */
 	private void readTail() throws IOException {
@@ -146,13 +191,15 @@ public class Tailer implements Serializable {
 			Stack<String> stack = new Stack<>();
 
 			long start = this.randomAccessFile.getFilePointer();
-			long nextEnd = len - 1;
+			long nextEnd = (len - 1) < 0 ? 0 : len - 1;
 			this.randomAccessFile.seek(nextEnd);
 			int c;
 			int currentLine = 0;
 			while (nextEnd > start) {
 				// 满
-				if (currentLine > initReadLine) {
+				if (currentLine >= initReadLine) {
+					// issue#IA77ML initReadLine是行数，从1开始，currentLine是行号，从0开始
+					// 因此行号0表示一行，所以currentLine == initReadLine表示读取完毕
 					break;
 				}
 
@@ -195,7 +242,7 @@ public class Tailer implements Serializable {
 
 	/**
 	 * 检查文件有效性
-	 * 
+	 *
 	 * @param file 文件
 	 */
 	private static void checkFile(File file) {
@@ -210,7 +257,7 @@ public class Tailer implements Serializable {
 
 	/**
 	 * 命令行打印的行处理器
-	 * 
+	 *
 	 * @author looly
 	 * @since 4.5.2
 	 */
@@ -220,4 +267,5 @@ public class Tailer implements Serializable {
 			Console.log(line);
 		}
 	}
+
 }

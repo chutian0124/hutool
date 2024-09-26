@@ -1,11 +1,16 @@
 package cn.hutool.extra.mail;
 
+import cn.hutool.core.lang.PatternPool;
 import cn.hutool.core.util.CharsetUtil;
+import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.setting.Setting;
 
 import java.io.Serializable;
 import java.nio.charset.Charset;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -20,21 +25,27 @@ public class MailAccount implements Serializable {
 	private static final String SMTP_HOST = "mail.smtp.host";
 	private static final String SMTP_PORT = "mail.smtp.port";
 	private static final String SMTP_AUTH = "mail.smtp.auth";
-	private static final String SMTP_CONNECTION_TIMEOUT = "mail.smtp.connectiontimeout";
 	private static final String SMTP_TIMEOUT = "mail.smtp.timeout";
+	private static final String SMTP_CONNECTION_TIMEOUT = "mail.smtp.connectiontimeout";
+	private static final String SMTP_WRITE_TIMEOUT = "mail.smtp.writetimeout";
 
+	// SSL
 	private static final String STARTTLS_ENABLE = "mail.smtp.starttls.enable";
 	private static final String SSL_ENABLE = "mail.smtp.ssl.enable";
+	private static final String SSL_PROTOCOLS = "mail.smtp.ssl.protocols";
 	private static final String SOCKET_FACTORY = "mail.smtp.socketFactory.class";
 	private static final String SOCKET_FACTORY_FALLBACK = "mail.smtp.socketFactory.fallback";
 	private static final String SOCKET_FACTORY_PORT = "smtp.socketFactory.port";
 
-	private static final String MAIL_DEBUG = "mail.debug";
+	// System Properties
 	private static final String SPLIT_LONG_PARAMS = "mail.mime.splitlongparameters";
+	//private static final String ENCODE_FILE_NAME = "mail.mime.encodefilename";
+	//private static final String CHARSET = "mail.mime.charset";
 
-	public static final String MAIL_SETTING_PATH = "config/mail.setting";
-	public static final String MAIL_SETTING_PATH2 = "config/mailAccount.setting";
-	public static final String MAIL_SETTING_PATH3 = "mail.setting";
+	// 其他
+	private static final String MAIL_DEBUG = "mail.debug";
+
+	public static final String[] MAIL_SETTING_PATHS = new String[]{"config/mail.setting", "config/mailAccount.setting", "mail.setting"};
 
 	/**
 	 * SMTP服务器域名
@@ -72,7 +83,11 @@ public class MailAccount implements Serializable {
 	/**
 	 * 对于超长参数是否切分为多份，默认为false（国内邮箱附件不支持切分的附件名）
 	 */
-	private boolean splitlongparameters;
+	private boolean splitlongparameters = false;
+	/**
+	 * 对于文件名是否使用{@link #charset}编码，默认为 {@code true}
+	 */
+	private boolean encodefilename = true;
 
 	/**
 	 * 使用 STARTTLS安全连接，STARTTLS是对纯文本通信协议的扩展。它将纯文本连接升级为加密连接（TLS或SSL）， 而不是使用一个单独的加密通信端口。
@@ -82,6 +97,12 @@ public class MailAccount implements Serializable {
 	 * 使用 SSL安全连接
 	 */
 	private Boolean sslEnable;
+
+	/**
+	 * SSL协议，多个协议用空格分隔
+	 */
+	private String sslProtocols;
+
 	/**
 	 * 指定实现javax.net.SocketFactory接口的类的名称,这个类将被用于创建SMTP的套接字
 	 */
@@ -103,6 +124,15 @@ public class MailAccount implements Serializable {
 	 * Socket连接超时值，单位毫秒，缺省值不超时
 	 */
 	private long connectionTimeout;
+	/**
+	 * Socket写出超时值，单位毫秒，缺省值不超时
+	 */
+	private long writeTimeout;
+
+	/**
+	 * 自定义的其他属性，此自定义属性会覆盖默认属性
+	 */
+	private final Map<String, Object> customProperty = new HashMap<>();
 
 	// -------------------------------------------------------------- Constructor start
 
@@ -128,6 +158,13 @@ public class MailAccount implements Serializable {
 	 */
 	public MailAccount(Setting setting) {
 		setting.toBean(this);
+
+		// since 5.8.30, custom property
+		setting.forEach((key, value) -> {
+			if (StrUtil.startWith(key, "mail.")) {
+				this.setCustomProperty(key, value);
+			}
+		});
 	}
 
 	// -------------------------------------------------------------- Constructor end
@@ -283,16 +320,19 @@ public class MailAccount implements Serializable {
 	/**
 	 * 获取字符集编码
 	 *
-	 * @return 编码
+	 * @return 编码，可能为{@code null}
 	 */
 	public Charset getCharset() {
 		return charset;
 	}
 
 	/**
-	 * 设置字符集编码
+	 * 设置字符集编码，此选项不会修改全局配置，若修改全局配置，请设置此项为{@code null}并设置：
+	 * <pre>
+	 * 	System.setProperty("mail.mime.charset", charset);
+	 * </pre>
 	 *
-	 * @param charset 字符集编码
+	 * @param charset 字符集编码，{@code null} 则表示使用全局设置的默认编码，全局编码为mail.mime.charset系统属性
 	 * @return this
 	 */
 	public MailAccount setCharset(Charset charset) {
@@ -310,12 +350,42 @@ public class MailAccount implements Serializable {
 	}
 
 	/**
-	 * 设置对于超长参数是否切分为多份，默认为false（国内邮箱附件不支持切分的附件名）
+	 * 设置对于超长参数是否切分为多份，默认为false（国内邮箱附件不支持切分的附件名）<br>
+	 * 注意此项为全局设置，此项会调用
+	 * <pre>
+	 * System.setProperty("mail.mime.splitlongparameters", true)
+	 * </pre>
 	 *
 	 * @param splitlongparameters 对于超长参数是否切分为多份
 	 */
 	public void setSplitlongparameters(boolean splitlongparameters) {
 		this.splitlongparameters = splitlongparameters;
+	}
+
+	/**
+	 * 对于文件名是否使用{@link #charset}编码，默认为 {@code true}
+	 *
+	 * @return 对于文件名是否使用{@link #charset}编码，默认为 {@code true}
+	 * @since 5.7.16
+	 */
+	public boolean isEncodefilename() {
+
+		return encodefilename;
+	}
+
+	/**
+	 * 设置对于文件名是否使用{@link #charset}编码，此选项不会修改全局配置<br>
+	 * 如果此选项设置为{@code false}，则是否编码取决于两个系统属性：
+	 * <ul>
+	 *     <li>mail.mime.encodefilename  是否编码附件文件名</li>
+	 *     <li>mail.mime.charset         编码文件名的编码</li>
+	 * </ul>
+	 *
+	 * @param encodefilename 对于文件名是否使用{@link #charset}编码
+	 * @since 5.7.16
+	 */
+	public void setEncodefilename(boolean encodefilename) {
+		this.encodefilename = encodefilename;
 	}
 
 	/**
@@ -356,6 +426,26 @@ public class MailAccount implements Serializable {
 	public MailAccount setSslEnable(Boolean sslEnable) {
 		this.sslEnable = sslEnable;
 		return this;
+	}
+
+	/**
+	 * 获取SSL协议，多个协议用空格分隔
+	 *
+	 * @return SSL协议，多个协议用空格分隔
+	 * @since 5.5.7
+	 */
+	public String getSslProtocols() {
+		return sslProtocols;
+	}
+
+	/**
+	 * 设置SSL协议，多个协议用空格分隔
+	 *
+	 * @param sslProtocols SSL协议，多个协议用空格分隔
+	 * @since 5.5.7
+	 */
+	public void setSslProtocols(String sslProtocols) {
+		this.sslProtocols = sslProtocols;
 	}
 
 	/**
@@ -443,6 +533,43 @@ public class MailAccount implements Serializable {
 	}
 
 	/**
+	 * 设置Socket写出超时值，单位毫秒，缺省值不超时
+	 *
+	 * @param writeTimeout Socket写出超时值，单位毫秒，缺省值不超时
+	 * @return this
+	 * @since 5.8.3
+	 */
+	public MailAccount setWriteTimeout(long writeTimeout) {
+		this.writeTimeout = writeTimeout;
+		return this;
+	}
+
+	/**
+	 * 获取自定义属性列表
+	 *
+	 * @return 自定义参数列表
+	 * @since 5.6.4
+	 */
+	public Map<String, Object> getCustomProperty() {
+		return customProperty;
+	}
+
+	/**
+	 * 设置自定义属性，如mail.smtp.ssl.socketFactory
+	 *
+	 * @param key   属性名，空白被忽略
+	 * @param value 属性值， null被忽略
+	 * @return this
+	 * @since 5.6.4
+	 */
+	public MailAccount setCustomProperty(String key, Object value) {
+		if (StrUtil.isNotBlank(key) && ObjectUtil.isNotNull(value)) {
+			this.customProperty.put(key, value);
+		}
+		return this;
+	}
+
+	/**
 	 * 获得SMTP相关信息
 	 *
 	 * @return {@link Properties}
@@ -462,12 +589,16 @@ public class MailAccount implements Serializable {
 		if (this.connectionTimeout > 0) {
 			p.put(SMTP_CONNECTION_TIMEOUT, String.valueOf(this.connectionTimeout));
 		}
+		// issue#2355
+		if (this.writeTimeout > 0) {
+			p.put(SMTP_WRITE_TIMEOUT, String.valueOf(this.writeTimeout));
+		}
 
 		p.put(MAIL_DEBUG, String.valueOf(this.debug));
 
 		if (this.starttlsEnable) {
 			//STARTTLS是对纯文本通信协议的扩展。它将纯文本连接升级为加密连接（TLS或SSL）， 而不是使用一个单独的加密通信端口。
-			p.put(STARTTLS_ENABLE, String.valueOf(this.starttlsEnable));
+			p.put(STARTTLS_ENABLE, "true");
 
 			if (null == this.sslEnable) {
 				//为了兼容旧版本，当用户没有此项配置时，按照starttlsEnable开启状态时对待
@@ -481,7 +612,14 @@ public class MailAccount implements Serializable {
 			p.put(SOCKET_FACTORY, socketFactoryClass);
 			p.put(SOCKET_FACTORY_FALLBACK, String.valueOf(this.socketFactoryFallback));
 			p.put(SOCKET_FACTORY_PORT, String.valueOf(this.socketFactoryPort));
+			// issue#IZN95@Gitee，在Linux下需自定义SSL协议版本
+			if (StrUtil.isNotBlank(this.sslProtocols)) {
+				p.put(SSL_PROTOCOLS, this.sslProtocols);
+			}
 		}
+
+		// 补充自定义属性，允许自定属性覆盖已经设置的值
+		p.putAll(this.customProperty);
 
 		return p;
 	}
@@ -493,15 +631,16 @@ public class MailAccount implements Serializable {
 	 */
 	public MailAccount defaultIfEmpty() {
 		// 去掉发件人的姓名部分
-		final String fromAddress = InternalMailUtil.parseFirstAddress(this.from, this.charset).getAddress();
+		final String fromAddress = ReUtil.get(PatternPool.EMAIL, this.from, 0);
 
 		if (StrUtil.isBlank(this.host)) {
 			// 如果SMTP地址为空，默认使用smtp.<发件人邮箱后缀>
 			this.host = StrUtil.format("smtp.{}", StrUtil.subSuf(fromAddress, fromAddress.indexOf('@') + 1));
 		}
 		if (StrUtil.isBlank(user)) {
-			// 如果用户名为空，默认为发件人邮箱前缀
-			this.user = StrUtil.subPre(fromAddress, fromAddress.indexOf('@'));
+			// 如果用户名为空，默认为发件人（issue#I4FYVY@Gitee）
+			//this.user = StrUtil.subPre(fromAddress, fromAddress.indexOf('@'));
+			this.user = fromAddress;
 		}
 		if (null == this.auth) {
 			// 如果密码非空白，则使用认证模式

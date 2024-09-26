@@ -1,5 +1,9 @@
 package cn.hutool.core.swing;
 
+import cn.hutool.core.exceptions.UtilException;
+import cn.hutool.core.img.ImgUtil;
+import cn.hutool.core.swing.clipboard.ClipboardUtil;
+
 import java.awt.AWTException;
 import java.awt.Rectangle;
 import java.awt.Robot;
@@ -8,33 +12,39 @@ import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 
-import cn.hutool.core.exceptions.UtilException;
-import cn.hutool.core.img.ImgUtil;
-import cn.hutool.core.swing.clipboard.ClipboardUtil;
-
 /**
  * {@link Robot} 封装工具类，提供截屏等工具
- * 
+ *
  * @author looly
  * @since 4.1.14
  */
 public class RobotUtil {
 
-	private static final Robot robot;
+	private static final Robot ROBOT;
 	private static int delay;
 
 	static {
 		try {
-			robot = new Robot();
+			ROBOT = new Robot();
 		} catch (AWTException e) {
 			throw new UtilException(e);
 		}
 	}
 
 	/**
+	 * 获取 Robot 单例实例
+	 *
+	 * @return {@link Robot}单例对象
+	 * @since 5.7.6
+	 */
+	public static Robot getRobot() {
+		return ROBOT;
+	}
+
+	/**
 	 * 设置默认的延迟时间<br>
 	 * 当按键执行完后的等待时间，也可以用ThreadUtil.sleep方法代替
-	 * 
+	 *
 	 * @param delayMillis 等待毫秒数
 	 * @since 4.5.7
 	 */
@@ -43,69 +53,79 @@ public class RobotUtil {
 	}
 
 	/**
+	 * 获取全局默认的延迟时间
+	 *
+	 * @return 全局默认的延迟时间
+	 * @since 5.7.6
+	 */
+	public static int getDelay() {
+		return delay;
+	}
+
+	/**
 	 * 模拟鼠标移动
-	 * 
+	 *
 	 * @param x 移动到的x坐标
 	 * @param y 移动到的y坐标
 	 * @since 4.5.7
 	 */
 	public static void mouseMove(int x, int y) {
-		robot.mouseMove(x, y);
+		ROBOT.mouseMove(x, y);
 	}
 
 	/**
 	 * 模拟单击<br>
 	 * 鼠标单击包括鼠标左键的按下和释放
-	 * 
+	 *
 	 * @since 4.5.7
 	 */
 	public static void click() {
-		robot.mousePress(InputEvent.BUTTON1_MASK);
-		robot.mouseRelease(InputEvent.BUTTON1_MASK);
+		ROBOT.mousePress(InputEvent.BUTTON1_MASK);
+		ROBOT.mouseRelease(InputEvent.BUTTON1_MASK);
 		delay();
 	}
 
 	/**
 	 * 模拟右键单击<br>
 	 * 鼠标单击包括鼠标右键的按下和释放
-	 * 
+	 *
 	 * @since 4.5.7
 	 */
 	public static void rightClick() {
-		robot.mousePress(InputEvent.BUTTON1_MASK);
-		robot.mouseRelease(InputEvent.BUTTON1_MASK);
+		ROBOT.mousePress(InputEvent.BUTTON3_MASK);
+		ROBOT.mouseRelease(InputEvent.BUTTON3_MASK);
 		delay();
 	}
 
 	/**
 	 * 模拟鼠标滚轮滚动
-	 * 
+	 *
 	 * @param wheelAmt 滚动数，负数表示向前滚动，正数向后滚动
 	 * @since 4.5.7
 	 */
 	public static void mouseWheel(int wheelAmt) {
-		robot.mouseWheel(wheelAmt);
+		ROBOT.mouseWheel(wheelAmt);
 		delay();
 	}
 
 	/**
 	 * 模拟键盘点击<br>
 	 * 包括键盘的按下和释放
-	 * 
+	 *
 	 * @param keyCodes 按键码列表，见{@link java.awt.event.KeyEvent}
 	 * @since 4.5.7
 	 */
 	public static void keyClick(int... keyCodes) {
 		for (int keyCode : keyCodes) {
-			robot.keyPress(keyCode);
-			robot.keyRelease(keyCode);
+			ROBOT.keyPress(keyCode);
+			ROBOT.keyRelease(keyCode);
 		}
 		delay();
 	}
 
 	/**
 	 * 打印输出指定字符串（借助剪贴板）
-	 * 
+	 *
 	 * @param str 字符串
 	 */
 	public static void keyPressString(String str) {
@@ -116,46 +136,46 @@ public class RobotUtil {
 
 	/**
 	 * shift+ 按键
-	 * 
+	 *
 	 * @param key 按键
 	 */
 	public static void keyPressWithShift(int key) {
-		robot.keyPress(KeyEvent.VK_SHIFT);
-		robot.keyPress(key);
-		robot.keyRelease(key);
-		robot.keyRelease(KeyEvent.VK_SHIFT);
+		ROBOT.keyPress(KeyEvent.VK_SHIFT);
+		ROBOT.keyPress(key);
+		ROBOT.keyRelease(key);
+		ROBOT.keyRelease(KeyEvent.VK_SHIFT);
 		delay();
 	}
 
 	/**
 	 * ctrl+ 按键
-	 * 
+	 *
 	 * @param key 按键
 	 */
 	public static void keyPressWithCtrl(int key) {
-		robot.keyPress(KeyEvent.VK_CONTROL);
-		robot.keyPress(key);
-		robot.keyRelease(key);
-		robot.keyRelease(KeyEvent.VK_CONTROL);
+		ROBOT.keyPress(KeyEvent.VK_CONTROL);
+		ROBOT.keyPress(key);
+		ROBOT.keyRelease(key);
+		ROBOT.keyRelease(KeyEvent.VK_CONTROL);
 		delay();
 	}
 
 	/**
 	 * alt+ 按键
-	 * 
+	 *
 	 * @param key 按键
 	 */
 	public static void keyPressWithAlt(int key) {
-		robot.keyPress(KeyEvent.VK_ALT);
-		robot.keyPress(key);
-		robot.keyRelease(key);
-		robot.keyRelease(KeyEvent.VK_ALT);
+		ROBOT.keyPress(KeyEvent.VK_ALT);
+		ROBOT.keyPress(key);
+		ROBOT.keyRelease(key);
+		ROBOT.keyRelease(KeyEvent.VK_ALT);
 		delay();
 	}
 
 	/**
 	 * 截取全屏
-	 * 
+	 *
 	 * @return 截屏的图片
 	 */
 	public static BufferedImage captureScreen() {
@@ -164,7 +184,7 @@ public class RobotUtil {
 
 	/**
 	 * 截取全屏到文件
-	 * 
+	 *
 	 * @param outFile 写出到的文件
 	 * @return 写出到的文件
 	 */
@@ -175,17 +195,17 @@ public class RobotUtil {
 
 	/**
 	 * 截屏
-	 * 
+	 *
 	 * @param screenRect 截屏的矩形区域
 	 * @return 截屏的图片
 	 */
 	public static BufferedImage captureScreen(Rectangle screenRect) {
-		return robot.createScreenCapture(screenRect);
+		return ROBOT.createScreenCapture(screenRect);
 	}
 
 	/**
 	 * 截屏
-	 * 
+	 *
 	 * @param screenRect 截屏的矩形区域
 	 * @param outFile 写出到的文件
 	 * @return 写出到的文件
@@ -198,9 +218,9 @@ public class RobotUtil {
 	/**
 	 * 等待指定毫秒数
 	 */
-	private static void delay() {
+	public static void delay() {
 		if (delay > 0) {
-			robot.delay(delay);
+			ROBOT.delay(delay);
 		}
 	}
 }

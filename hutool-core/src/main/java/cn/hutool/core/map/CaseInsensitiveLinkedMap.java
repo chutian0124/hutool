@@ -6,7 +6,7 @@ import java.util.Map;
 /**
  * 忽略大小写的LinkedHashMap<br>
  * 对KEY忽略大小写，get("Value")和get("value")获得的值相同，put进入的值也会被覆盖
- * 
+ *
  * @author Looly
  *
  * @param <K> 键类型
@@ -26,7 +26,7 @@ public class CaseInsensitiveLinkedMap<K, V> extends CaseInsensitiveMap<K, V> {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param initialCapacity 初始大小
 	 */
 	public CaseInsensitiveLinkedMap(int initialCapacity) {
@@ -35,7 +35,7 @@ public class CaseInsensitiveLinkedMap<K, V> extends CaseInsensitiveMap<K, V> {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param m Map
 	 */
 	public CaseInsensitiveLinkedMap(Map<? extends K, ? extends V> m) {
@@ -44,7 +44,7 @@ public class CaseInsensitiveLinkedMap<K, V> extends CaseInsensitiveMap<K, V> {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param loadFactor 加载因子
 	 * @param m Map
 	 * @since 3.1.2
@@ -56,12 +56,12 @@ public class CaseInsensitiveLinkedMap<K, V> extends CaseInsensitiveMap<K, V> {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param initialCapacity 初始大小
 	 * @param loadFactor 加载因子
 	 */
 	public CaseInsensitiveLinkedMap(int initialCapacity, float loadFactor) {
-		super(new LinkedHashMap<K, V>(initialCapacity, loadFactor));
+		super(MapBuilder.create(new LinkedHashMap<>(initialCapacity, loadFactor)));
 	}
 	// ------------------------------------------------------------------------- Constructor end
 }

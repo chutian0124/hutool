@@ -1,19 +1,8 @@
 package cn.hutool.setting;
 
-import java.io.File;
-import java.net.URL;
-import java.nio.charset.Charset;
-import java.nio.file.Path;
-import java.nio.file.WatchEvent;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
+import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.io.resource.ClassPathResource;
 import cn.hutool.core.io.resource.FileResource;
@@ -29,6 +18,19 @@ import cn.hutool.core.util.CharsetUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.log.StaticLog;
 import cn.hutool.setting.dialect.Props;
+
+import java.io.File;
+import java.net.URL;
+import java.nio.charset.Charset;
+import java.nio.file.Path;
+import java.nio.file.WatchEvent;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * 设置工具类。 用于支持设置（配置）文件<br>
@@ -49,11 +51,21 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	/**
 	 * 默认字符集
 	 */
-	public final static Charset DEFAULT_CHARSET = CharsetUtil.CHARSET_UTF_8;
+	public static final Charset DEFAULT_CHARSET = CharsetUtil.CHARSET_UTF_8;
 	/**
 	 * 默认配置文件扩展名
 	 */
-	public final static String EXT_NAME = "setting";
+	public static final String EXT_NAME = "setting";
+
+	/**
+	 * 构建一个空的Setting，用于手动加入参数
+	 *
+	 * @return Setting
+	 * @since 5.4.3
+	 */
+	public static Setting create() {
+		return new Setting();
+	}
 
 	/**
 	 * 附带分组的键值对存储
@@ -69,9 +81,9 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	 */
 	protected boolean isUseVariable;
 	/**
-	 * 设定文件的URL
+	 * 设定文件的资源
 	 */
-	protected URL settingUrl;
+	protected Resource resource;
 
 	private SettingLoader settingLoader;
 	private WatchMonitor watchMonitor;
@@ -152,6 +164,18 @@ public class Setting extends AbsSetting implements Map<String, String> {
 		Assert.notNull(url, "Null setting url define!");
 		this.init(new UrlResource(url), charset, isUseVariable);
 	}
+
+	/**
+	 * 构造
+	 *
+	 * @param resource      Setting的Resource
+	 * @param charset       字符集
+	 * @param isUseVariable 是否使用变量
+	 * @since 5.4.4
+	 */
+	public Setting(Resource resource, Charset charset, boolean isUseVariable) {
+		this.init(resource, charset, isUseVariable);
+	}
 	// ------------------------------------------------------------------------------------- Constructor end
 
 	/**
@@ -163,10 +187,8 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	 * @return 成功初始化与否
 	 */
 	public boolean init(Resource resource, Charset charset, boolean isUseVariable) {
-		if (resource == null) {
-			throw new NullPointerException("Null setting url define!");
-		}
-		this.settingUrl = resource.getUrl();
+		Assert.notNull(resource, "Setting resource must be not null!");
+		this.resource = resource;
 		this.charset = charset;
 		this.isUseVariable = isUseVariable;
 
@@ -182,7 +204,7 @@ public class Setting extends AbsSetting implements Map<String, String> {
 		if (null == this.settingLoader) {
 			settingLoader = new SettingLoader(this.groupedMap, this.charset, this.isUseVariable);
 		}
-		return settingLoader.load(new UrlResource(this.settingUrl));
+		return settingLoader.load(this.resource);
 	}
 
 	/**
@@ -191,20 +213,34 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	 * @param autoReload 是否自动加载
 	 */
 	public void autoLoad(boolean autoReload) {
+		autoLoad(autoReload, null);
+	}
+
+	/**
+	 * 在配置文件变更时自动加载
+	 *
+	 * @param callback   加载完成回调
+	 * @param autoReload 是否自动加载
+	 */
+	public void autoLoad(boolean autoReload, Consumer<Boolean> callback) {
 		if (autoReload) {
-			Assert.notNull(this.settingUrl, "Setting URL is null !");
+			Assert.notNull(this.resource, "Setting resource must be not null !");
 			if (null != this.watchMonitor) {
 				// 先关闭之前的监听
 				this.watchMonitor.close();
 			}
-			this.watchMonitor = WatchUtil.createModify(this.settingUrl, new SimpleWatcher() {
+			this.watchMonitor = WatchUtil.createModify(resource.getUrl(), new SimpleWatcher() {
 				@Override
 				public void onModify(WatchEvent<?> event, Path currentPath) {
-					load();
+					boolean success = load();
+					// 如果有回调，加载完毕则执行回调
+					if (callback != null) {
+						callback.accept(success);
+					}
 				}
 			});
 			this.watchMonitor.start();
-			StaticLog.debug("Auto load for [{}] listenning...", this.settingUrl);
+			StaticLog.debug("Auto load for [{}] listenning...", this.resource.getUrl());
 		} else {
 			IoUtil.close(this.watchMonitor);
 			this.watchMonitor = null;
@@ -212,10 +248,23 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	}
 
 	/**
+	 * 获得设定文件的URL
+	 *
+	 * @return 获得设定文件的路径
+	 * @since 5.4.3
+	 */
+	public URL getSettingUrl() {
+		return (null == this.resource) ? null : this.resource.getUrl();
+	}
+
+	/**
+	 * 获得设定文件的路径
+	 *
 	 * @return 获得设定文件的路径
 	 */
 	public String getSettingPath() {
-		return (null == this.settingUrl) ? null : this.settingUrl.getPath();
+		final URL settingUrl = getSettingUrl();
+		return (null == settingUrl) ? null : settingUrl.getPath();
 	}
 
 	/**
@@ -223,6 +272,7 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	 *
 	 * @return 键值总数
 	 */
+	@Override
 	public int size() {
 		return this.groupedMap.size();
 	}
@@ -280,10 +330,10 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	}
 
 	/**
-	 * 获取group分组下所有配置键值对，组成新的{@link Setting}
+	 * 获取group分组下所有配置键值对，组成新的Setting
 	 *
 	 * @param group 分组
-	 * @return {@link Setting}
+	 * @return Setting
 	 */
 	public Setting getSetting(String group) {
 		final Setting setting = new Setting();
@@ -320,15 +370,38 @@ public class Setting extends AbsSetting implements Map<String, String> {
 
 	/**
 	 * 持久化当前设置，会覆盖掉之前的设置<br>
+	 * 持久化不会保留之前的分组，注意如果配置文件在jar内部或者在exe中，此方法会报错。
+	 *
+	 * @since 5.4.3
+	 */
+	public void store() {
+		final URL resourceUrl = getSettingUrl();
+		Assert.notNull(resourceUrl, "Setting path must be not null !");
+		store(FileUtil.file(resourceUrl));
+	}
+
+	/**
+	 * 持久化当前设置，会覆盖掉之前的设置<br>
 	 * 持久化不会保留之前的分组
 	 *
 	 * @param absolutePath 设置文件的绝对路径
 	 */
 	public void store(String absolutePath) {
+		store(FileUtil.touch(absolutePath));
+	}
+
+	/**
+	 * 持久化当前设置，会覆盖掉之前的设置<br>
+	 * 持久化不会保留之前的分组
+	 *
+	 * @param file 设置文件
+	 * @since 5.4.3
+	 */
+	public void store(File file) {
 		if (null == this.settingLoader) {
 			settingLoader = new SettingLoader(this.groupedMap, this.charset, this.isUseVariable);
 		}
-		settingLoader.store(absolutePath);
+		settingLoader.store(file);
 	}
 
 	/**
@@ -442,12 +515,12 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	/**
 	 * 将键值对加入到对应分组中
 	 *
-	 * @param group 分组
 	 * @param key   键
+	 * @param group 分组
 	 * @param value 值
 	 * @return 此key之前存在的值，如果没有返回null
 	 */
-	public String put(String group, String key, String value) {
+	public String putByGroup(String key, String group, String value) {
 		return this.groupedMap.put(group, key, value);
 	}
 
@@ -471,6 +544,20 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	 */
 	public Setting putAll(String group, Map<? extends String, ? extends String> m) {
 		this.groupedMap.putAll(group, m);
+		return this;
+	}
+
+	/**
+	 * 添加一个Stting到主配置中
+	 *
+	 * @param setting Setting配置
+	 * @return this
+	 * @since 5.2.4
+	 */
+	public Setting addSetting(Setting setting) {
+		for (Entry<String, LinkedHashMap<String, String>> e : setting.getGroupedMap().entrySet()) {
+			this.putAll(e.getKey(), e.getValue());
+		}
 		return this;
 	}
 
@@ -529,15 +616,17 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	}
 
 	/**
-	 * 将键值对加入到对应分组中
+	 * 将键值对加入到对应分组中<br>
+	 * 此方法用于与getXXX统一参数顺序
 	 *
-	 * @param group 分组
 	 * @param key   键
+	 * @param group 分组
 	 * @param value 值
 	 * @return 此key之前存在的值，如果没有返回null
+	 * @since 5.5.7
 	 */
-	public Setting set(String group, String key, String value) {
-		this.put(group, key, value);
+	public Setting setByGroup(String key, String group, String value) {
+		this.putByGroup(key, group, value);
 		return this;
 	}
 
@@ -608,6 +697,7 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	 *
 	 * @param m Map
 	 */
+	@SuppressWarnings("NullableProblems")
 	@Override
 	public void putAll(Map<? extends String, ? extends String> m) {
 		this.groupedMap.putAll(DEFAULT_GROUP, m);
@@ -626,6 +716,7 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	 *
 	 * @return 默认分组（空分组）中的所有键列表
 	 */
+	@SuppressWarnings("NullableProblems")
 	@Override
 	public Set<String> keySet() {
 		return this.groupedMap.keySet(DEFAULT_GROUP);
@@ -636,6 +727,7 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	 *
 	 * @return 默认分组（空分组）中的所有值列表
 	 */
+	@SuppressWarnings("NullableProblems")
 	@Override
 	public Collection<String> values() {
 		return this.groupedMap.values(DEFAULT_GROUP);
@@ -646,6 +738,7 @@ public class Setting extends AbsSetting implements Map<String, String> {
 	 *
 	 * @return 默认分组（空分组）中的所有键值对列表
 	 */
+	@SuppressWarnings("NullableProblems")
 	@Override
 	public Set<Entry<String, String>> entrySet() {
 		return this.groupedMap.entrySet(DEFAULT_GROUP);
@@ -656,9 +749,9 @@ public class Setting extends AbsSetting implements Map<String, String> {
 		final int prime = 31;
 		int result = 1;
 		result = prime * result + ((charset == null) ? 0 : charset.hashCode());
-		result = prime * result + ((groupedMap == null) ? 0 : groupedMap.hashCode());
+		result = prime * result + groupedMap.hashCode();
 		result = prime * result + (isUseVariable ? 1231 : 1237);
-		result = prime * result + ((settingUrl == null) ? 0 : settingUrl.hashCode());
+		result = prime * result + ((this.resource == null) ? 0 : this.resource.hashCode());
 		return result;
 	}
 
@@ -681,20 +774,16 @@ public class Setting extends AbsSetting implements Map<String, String> {
 		} else if (false == charset.equals(other.charset)) {
 			return false;
 		}
-		if (groupedMap == null) {
-			if (other.groupedMap != null) {
-				return false;
-			}
-		} else if (false == groupedMap.equals(other.groupedMap)) {
+		if (false == groupedMap.equals(other.groupedMap)) {
 			return false;
 		}
 		if (isUseVariable != other.isUseVariable) {
 			return false;
 		}
-		if (settingUrl == null) {
-			return other.settingUrl == null;
+		if (this.resource == null) {
+			return other.resource == null;
 		} else {
-			return settingUrl.equals(other.settingUrl);
+			return resource.equals(other.resource);
 		}
 	}
 

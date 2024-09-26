@@ -6,7 +6,7 @@ import cn.hutool.core.util.CharUtil;
 
 /**
  * 形如&#39;的反转义器
- * 
+ *
  * @author looly
  *
  */
@@ -48,7 +48,7 @@ public class NumericEntityUnescaper extends StrReplacer {
 					return 0;
 				}
 				out.append((char)entityValue);
-				return 2 + end - start + (isHex ? 1 : 0) + (isSemiNext ? 1 : 0);
+				return 2 + end - start + (isHex ? 1 : 0) + 1;
 			}
 		}
 		return 0;

@@ -1,10 +1,14 @@
 package cn.hutool.db.meta;
 
+import cn.hutool.core.map.SafeConcurrentHashMap;
+
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
+ * JDBC中字段类型枚举
+ *
  * @author Clinton Begin
+ * @see java.sql.Types
  */
 public enum JdbcType {
 	ARRAY(java.sql.Types.ARRAY), //
@@ -53,28 +57,28 @@ public enum JdbcType {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param code {@link java.sql.Types} 中对应的值
 	 */
 	JdbcType(int code) {
 		this.typeCode = code;
 	}
 
-	private static Map<Integer, JdbcType> codeMap = new ConcurrentHashMap<>(100, 1);
+	private static final Map<Integer, JdbcType> CODE_MAP = new SafeConcurrentHashMap<>(100, 1);
 	static {
 		for (JdbcType type : JdbcType.values()) {
-			codeMap.put(type.typeCode, type);
+			CODE_MAP.put(type.typeCode, type);
 		}
 	}
 
 	/**
 	 * 通过{@link java.sql.Types}中对应int值找到enum值
-	 * 
+	 *
 	 * @param code Jdbc type值
-	 * @return {@link JdbcType}
+	 * @return {@code JdbcType}
 	 */
 	public static JdbcType valueOf(int code) {
-		return codeMap.get(code);
+		return CODE_MAP.get(code);
 	}
-	
+
 }

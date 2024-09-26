@@ -1,15 +1,28 @@
 package cn.hutool.core.lang.mutable;
 
+import cn.hutool.core.util.ObjUtil;
+
 import java.io.Serializable;
 
 /**
- * 可变<code>Object</code>
- * 
+ * 可变{@code Object}
+ *
  * @param <T> 可变的类型
  * @since 3.0.1
  */
 public class MutableObj<T> implements Mutable<T>, Serializable {
 	private static final long serialVersionUID = 1L;
+
+	/**
+	 * 构建MutableObj
+	 * @param value 被包装的值
+	 * @param <T> 值类型
+	 * @return MutableObj
+	 * @since 5.8.0
+	 */
+	public static <T> MutableObj<T> of(T value){
+		return new MutableObj<>(value);
+	}
 
 	private T value;
 
@@ -17,16 +30,14 @@ public class MutableObj<T> implements Mutable<T>, Serializable {
 	 * 构造，空值
 	 */
 	public MutableObj() {
-		super();
 	}
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param value 值
 	 */
 	public MutableObj(final T value) {
-		super();
 		this.value = value;
 	}
 
@@ -52,7 +63,7 @@ public class MutableObj<T> implements Mutable<T>, Serializable {
 		}
 		if (this.getClass() == obj.getClass()) {
 			final MutableObj<?> that = (MutableObj<?>) obj;
-			return this.value.equals(that.value);
+			return ObjUtil.equals(this.value, that.value);
 		}
 		return false;
 	}

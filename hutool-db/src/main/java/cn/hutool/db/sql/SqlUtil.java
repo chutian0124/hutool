@@ -1,5 +1,12 @@
 package cn.hutool.db.sql;
 
+import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.util.CharsetUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.db.DbRuntimeException;
+import cn.hutool.db.Entity;
+import cn.hutool.db.sql.Condition.LikeType;
+
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
@@ -11,13 +18,6 @@ import java.sql.RowId;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map.Entry;
-
-import cn.hutool.core.io.IoUtil;
-import cn.hutool.core.util.CharsetUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.db.DbRuntimeException;
-import cn.hutool.db.Entity;
-import cn.hutool.db.sql.Condition.LikeType;
 
 /**
  * SQL相关工具类，包括相关SQL语句拼接等
@@ -85,17 +85,17 @@ public class SqlUtil {
 	 * 创建LIKE语句中的值，创建的结果为：
 	 *
 	 * <pre>
-	 * 1、LikeType.StartWith: %value
-	 * 2、LikeType.EndWith: value%
-	 * 3、LikeType.Contains: %value%
+	 * 1、LikeType.StartWith: '%value'
+	 * 2、LikeType.EndWith: 'value%'
+	 * 3、LikeType.Contains: '%value%'
 	 * </pre>
 	 * <p>
 	 * 如果withLikeKeyword为true，则结果为：
 	 *
 	 * <pre>
-	 * 1、LikeType.StartWith: LIKE %value
-	 * 2、LikeType.EndWith: LIKE value%
-	 * 3、LikeType.Contains: LIKE %value%
+	 * 1、LikeType.StartWith: LIKE '%value'
+	 * 2、LikeType.EndWith: LIKE 'value%'
+	 * 3、LikeType.Contains: LIKE '%value%'
 	 * </pre>
 	 *
 	 * @param value           被查找值
@@ -105,16 +105,16 @@ public class SqlUtil {
 	 */
 	public static String buildLikeValue(String value, LikeType likeType, boolean withLikeKeyword) {
 		if (null == value) {
-			return value;
+			return null;
 		}
 
 		StringBuilder likeValue = StrUtil.builder(withLikeKeyword ? "LIKE " : "");
 		switch (likeType) {
 			case StartWith:
-				likeValue.append('%').append(value);
+				likeValue.append(value).append('%');
 				break;
 			case EndWith:
-				likeValue.append(value).append('%');
+				likeValue.append('%').append(value);
 				break;
 			case Contains:
 				likeValue.append('%').append(value).append('%');

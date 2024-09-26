@@ -1,13 +1,5 @@
 package cn.hutool.db;
 
-import java.io.Closeable;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Savepoint;
-
-import javax.sql.DataSource;
-
-import cn.hutool.core.lang.func.VoidFunc0;
 import cn.hutool.core.lang.func.VoidFunc1;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.db.dialect.Dialect;
@@ -17,12 +9,18 @@ import cn.hutool.db.sql.Wrapper;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 
+import javax.sql.DataSource;
+import java.io.Closeable;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Savepoint;
+
 /**
  * 数据库SQL执行会话<br>
  * 会话通过共用Connection而可以实现JDBC事务<br>
  * 一个会话只维护一个连接，推荐在执行完后关闭Session，避免重用<br>
  * 本对象并不是线程安全的，多个线程共用一个Session将会导致不可预知的问题
- * 
+ *
  * @author loolly
  *
  */
@@ -32,19 +30,19 @@ public class Session extends AbstractDb implements Closeable {
 
 	/**
 	 * 创建默认数据源会话
-	 * 
-	 * @return {@link Session}
+	 *
+	 * @return Session
 	 * @since 3.2.3
 	 */
 	public static Session create() {
 		return new Session(DSFactory.get());
 	}
-	
+
 	/**
 	 * 创建会话
-	 * 
+	 *
 	 * @param group 分组
-	 * @return {@link Session}
+	 * @return Session
 	 * @since 4.0.11
 	 */
 	public static Session create(String group) {
@@ -53,9 +51,9 @@ public class Session extends AbstractDb implements Closeable {
 
 	/**
 	 * 创建会话
-	 * 
+	 *
 	 * @param ds 数据源
-	 * @return {@link Session}
+	 * @return Session
 	 */
 	public static Session create(DataSource ds) {
 		return new Session(ds);
@@ -64,16 +62,16 @@ public class Session extends AbstractDb implements Closeable {
 	// ---------------------------------------------------------------------------- Constructor start
 	/**
 	 * 构造，从DataSource中识别方言
-	 * 
+	 *
 	 * @param ds 数据源
 	 */
 	public Session(DataSource ds) {
 		this(ds, DialectFactory.getDialect(ds));
 	}
-	
+
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param ds 数据源
 	 * @param driverClassName 数据库连接驱动类名，用于识别方言
 	 */
@@ -83,7 +81,7 @@ public class Session extends AbstractDb implements Closeable {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param ds 数据源
 	 * @param dialect 方言
 	 */
@@ -95,9 +93,10 @@ public class Session extends AbstractDb implements Closeable {
 	// ---------------------------------------------------------------------------- Getters and Setters end
 	/**
 	 * 获得{@link SqlConnRunner}
-	 * 
+	 *
 	 * @return {@link SqlConnRunner}
 	 */
+	@Override
 	public SqlConnRunner getRunner() {
 		return runner;
 	}
@@ -106,7 +105,7 @@ public class Session extends AbstractDb implements Closeable {
 	// ---------------------------------------------------------------------------- Transaction method start
 	/**
 	 * 开始事务
-	 * 
+	 *
 	 * @throws SQLException SQL执行异常
 	 */
 	public void beginTransaction() throws SQLException {
@@ -117,7 +116,7 @@ public class Session extends AbstractDb implements Closeable {
 
 	/**
 	 * 提交事务
-	 * 
+	 *
 	 * @throws SQLException SQL执行异常
 	 */
 	public void commit() throws SQLException {
@@ -134,7 +133,7 @@ public class Session extends AbstractDb implements Closeable {
 
 	/**
 	 * 回滚事务
-	 * 
+	 *
 	 * @throws SQLException SQL执行异常
 	 */
 	public void rollback() throws SQLException {
@@ -169,7 +168,7 @@ public class Session extends AbstractDb implements Closeable {
 
 	/**
 	 * 回滚到某个保存点，保存点的设置请使用setSavepoint方法
-	 * 
+	 *
 	 * @param savepoint 保存点
 	 * @throws SQLException SQL执行异常
 	 */
@@ -187,7 +186,7 @@ public class Session extends AbstractDb implements Closeable {
 
 	/**
 	 * 静默回滚到某个保存点，保存点的设置请使用setSavepoint方法
-	 * 
+	 *
 	 * @param savepoint 保存点
 	 */
 	public void quietRollback(Savepoint savepoint) {
@@ -206,7 +205,7 @@ public class Session extends AbstractDb implements Closeable {
 
 	/**
 	 * 设置保存点
-	 * 
+	 *
 	 * @return 保存点对象
 	 * @throws SQLException SQL执行异常
 	 */
@@ -216,7 +215,7 @@ public class Session extends AbstractDb implements Closeable {
 
 	/**
 	 * 设置保存点
-	 * 
+	 *
 	 * @param name 保存点的名称
 	 * @return 保存点对象
 	 * @throws SQLException SQL执行异常
@@ -227,13 +226,13 @@ public class Session extends AbstractDb implements Closeable {
 
 	/**
 	 * 设置事务的隔离级别<br>
-	 * 
+	 *
 	 * Connection.TRANSACTION_NONE 驱动不支持事务<br>
 	 * Connection.TRANSACTION_READ_UNCOMMITTED 允许脏读、不可重复读和幻读<br>
 	 * Connection.TRANSACTION_READ_COMMITTED 禁止脏读，但允许不可重复读和幻读<br>
 	 * Connection.TRANSACTION_REPEATABLE_READ 禁止脏读和不可重复读，单运行幻读<br>
 	 * Connection.TRANSACTION_SERIALIZABLE 禁止脏读、不可重复读和幻读<br>
-	 * 
+	 *
 	 * @param level 隔离级别
 	 * @throws SQLException SQL执行异常
 	 */
@@ -243,10 +242,10 @@ public class Session extends AbstractDb implements Closeable {
 		}
 		getConnection().setTransactionIsolation(level);
 	}
-	
+
 	/**
-	 * 在事务中执行操作，通过实现{@link VoidFunc0}接口的call方法执行多条SQL语句从而完成事务
-	 * 
+	 * 在事务中执行操作，通过实现{@link VoidFunc1}接口的call方法执行多条SQL语句从而完成事务
+	 *
 	 * @param func 函数抽象，在函数中执行多个SQL操作，多个操作会被合并为同一事务
 	 * @throws SQLException SQL异常
 	 * @since 3.2.3
@@ -262,24 +261,6 @@ public class Session extends AbstractDb implements Closeable {
 		}
 	}
 
-	/**
-	 * 在事务中执行操作，通过实现{@link VoidFunc0}接口的call方法执行多条SQL语句从而完成事务
-	 * 
-	 * @param func 函数抽象，在函数中执行多个SQL操作，多个操作会被合并为同一事务
-	 * @since 3.2.3
-	 * @deprecated 请使用{@link #tx(VoidFunc1)}
-	 */
-	@Deprecated
-	public void trans(VoidFunc1<Session> func) {
-		try {
-			beginTransaction();
-			func.call(this);
-			commit();
-		} catch (Exception e) {
-			quietRollback();
-			throw new DbRuntimeException(e);
-		}
-	}
 	// ---------------------------------------------------------------------------- Transaction method end
 
 	// ---------------------------------------------------------------------------- Getters and Setters start
@@ -292,7 +273,7 @@ public class Session extends AbstractDb implements Closeable {
 	public Session setWrapper(Wrapper wrapper) {
 		return (Session) super.setWrapper(wrapper);
 	}
-	
+
 	@Override
 	public Session disableWrapper() {
 		return (Session) super.disableWrapper();
@@ -314,7 +295,7 @@ public class Session extends AbstractDb implements Closeable {
 		} catch (SQLException e) {
 			log.error(e);
 		}
-		
+
 		// 普通请求关闭（或归还）连接
 		ThreadLocalConnection.INSTANCE.close(this.ds);
 	}

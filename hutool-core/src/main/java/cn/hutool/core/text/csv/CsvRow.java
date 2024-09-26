@@ -1,5 +1,8 @@
 package cn.hutool.core.text.csv;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.lang.Assert;
+
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -22,20 +25,20 @@ public final class CsvRow implements List<String> {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param originalLineNumber 对应文件中的第几行
 	 * @param headerMap 标题Map
 	 * @param fields 数据列表
 	 */
-	public CsvRow(final long originalLineNumber, final Map<String, Integer> headerMap, final List<String> fields) {
-
+	public CsvRow(long originalLineNumber, Map<String, Integer> headerMap, List<String> fields) {
+		Assert.notNull(fields, "fields must be not null!");
 		this.originalLineNumber = originalLineNumber;
 		this.headerMap = headerMap;
 		this.fields = fields;
 	}
 
 	/**
-	 * 获取原始行号，多行情况下为首行行号。
+	 * 获取原始行号，多行情况下为首行行号。忽略注释行
 	 *
 	 * @return the original line number 行号
 	 */
@@ -50,10 +53,8 @@ public final class CsvRow implements List<String> {
 	 * @return 字段值，null表示无此字段值
 	 * @throws IllegalStateException CSV文件无标题行抛出此异常
 	 */
-	public String getByName(final String name) {
-		if (headerMap == null) {
-			throw new IllegalStateException("No header available");
-		}
+	public String getByName(String name) {
+		Assert.notNull(this.headerMap, "No header available!");
 
 		final Integer col = headerMap.get(name);
 		if (col != null) {
@@ -74,7 +75,7 @@ public final class CsvRow implements List<String> {
 	/**
 	 * 获取标题与字段值对应的Map
 	 *
-	 * @return an unmodifiable map of header names and field values of this row
+	 * @return 标题与字段值对应的Map
 	 * @throws IllegalStateException CSV文件无标题行抛出此异常
 	 */
 	public Map<String, String> getFieldMap() {
@@ -82,7 +83,7 @@ public final class CsvRow implements List<String> {
 			throw new IllegalStateException("No header available");
 		}
 
-		final Map<String, String> fieldMap = new LinkedHashMap<>(headerMap.size());
+		final Map<String, String> fieldMap = new LinkedHashMap<>(headerMap.size(), 1);
 		String key;
 		Integer col;
 		String val;
@@ -94,6 +95,18 @@ public final class CsvRow implements List<String> {
 		}
 
 		return fieldMap;
+	}
+
+	/**
+	 * 一行数据转换为Bean对象
+	 *
+	 * @param <T> Bean类型
+	 * @param clazz bean类
+	 * @return Bean
+	 * @since 5.3.6
+	 */
+	public <T> T toBean(Class<T> clazz){
+		return BeanUtil.toBeanIgnoreError(getFieldMap(), clazz);
 	}
 
 	/**

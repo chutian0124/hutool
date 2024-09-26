@@ -1,12 +1,10 @@
 package cn.hutool.http.useragent;
 
-import java.util.regex.Pattern;
-
-import cn.hutool.core.util.ReUtil;
+import cn.hutool.core.util.StrUtil;
 
 /**
  * User-Agent解析器
- * 
+ *
  * @author looly
  * @since 4.2.1
  */
@@ -14,49 +12,64 @@ public class UserAgentParser {
 
 	/**
 	 * 解析User-Agent
-	 * 
+	 *
 	 * @param userAgentString User-Agent字符串
 	 * @return {@link UserAgent}
 	 */
 	public static UserAgent parse(String userAgentString) {
+		if(StrUtil.isBlank(userAgentString)){
+			return null;
+		}
 		final UserAgent userAgent = new UserAgent();
-		
+
+		// 浏览器
 		final Browser browser = parseBrowser(userAgentString);
-		userAgent.setBrowser(parseBrowser(userAgentString));
+		userAgent.setBrowser(browser);
 		userAgent.setVersion(browser.getVersion(userAgentString));
-		
+
+		// 浏览器引擎
 		final Engine engine = parseEngine(userAgentString);
 		userAgent.setEngine(engine);
-		if (false == engine.isUnknown()) {
-			userAgent.setEngineVersion(parseEngineVersion(engine, userAgentString));
-		}
-		userAgent.setOs(parseOS(userAgentString));
+		userAgent.setEngineVersion(engine.getVersion(userAgentString));
+
+		// 操作系统
+		final OS os = parseOS(userAgentString);
+		userAgent.setOs(os);
+		userAgent.setOsVersion(os.getVersion(userAgentString));
+
+		// 平台
 		final Platform platform = parsePlatform(userAgentString);
 		userAgent.setPlatform(platform);
-		userAgent.setMobile(platform.isMobile() || browser.isMobile());
-		
+
+		// issue#IA74K2 MACOS下的微信不属于移动平台
+		if(platform.isMobile() || browser.isMobile()){
+			if(false == os.isMacOS()){
+				userAgent.setMobile(true);
+			}
+		}
+
 
 		return userAgent;
 	}
 
 	/**
 	 * 解析浏览器类型
-	 * 
+	 *
 	 * @param userAgentString User-Agent字符串
 	 * @return 浏览器类型
 	 */
 	private static Browser parseBrowser(String userAgentString) {
-		for (Browser brower : Browser.browers) {
-			if (brower.isMatch(userAgentString)) {
-				return brower;
+		for (Browser browser : Browser.browers) {
+			if (browser.isMatch(userAgentString)) {
+				return browser;
 			}
 		}
 		return Browser.Unknown;
 	}
-	
+
 	/**
 	 * 解析引擎类型
-	 * 
+	 *
 	 * @param userAgentString User-Agent字符串
 	 * @return 引擎类型
 	 */
@@ -70,21 +83,8 @@ public class UserAgentParser {
 	}
 
 	/**
-	 * 解析引擎版本
-	 * 
-	 * @param engine 引擎
-	 * @param userAgentString User-Agent字符串
-	 * @return 引擎版本
-	 */
-	private static String parseEngineVersion(Engine engine, String userAgentString) {
-		final String regexp = engine.getName() + "[\\/\\- ]([\\d\\w\\.\\-]+)";
-		final Pattern pattern = Pattern.compile(regexp, Pattern.CASE_INSENSITIVE);
-		return ReUtil.getGroup1(pattern, userAgentString);
-	}
-
-	/**
 	 * 解析系统类型
-	 * 
+	 *
 	 * @param userAgentString User-Agent字符串
 	 * @return 系统类型
 	 */
@@ -99,7 +99,7 @@ public class UserAgentParser {
 
 	/**
 	 * 解析平台类型
-	 * 
+	 *
 	 * @param userAgentString User-Agent字符串
 	 * @return 平台类型
 	 */

@@ -4,7 +4,7 @@ import cn.hutool.core.util.StrUtil;
 
 /**
  * 依赖异常
- * 
+ *
  * @author xiaoleilu
  * @since 4.0.10
  */
@@ -25,6 +25,10 @@ public class DependencyException extends RuntimeException {
 
 	public DependencyException(String message, Throwable throwable) {
 		super(message, throwable);
+	}
+
+	public DependencyException(String message, Throwable throwable, boolean enableSuppression, boolean writableStackTrace) {
+		super(message, throwable, enableSuppression, writableStackTrace);
 	}
 
 	public DependencyException(Throwable throwable, String messageTemplate, Object... params) {

@@ -1,6 +1,6 @@
 package cn.hutool.db.ds.pooled;
 
-import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.db.DbRuntimeException;
 import cn.hutool.db.dialect.DriverUtil;
@@ -9,7 +9,7 @@ import cn.hutool.setting.Setting;
 
 /**
  * 数据库配置文件类，此类对应一个数据库配置文件
- * 
+ *
  * @author Looly
  *
  */
@@ -17,7 +17,7 @@ public class DbSetting {
 	/** 默认的数据库连接配置文件路径 */
 	public final static String DEFAULT_DB_CONFIG_PATH = "config/db.setting";
 
-	private Setting setting;
+	private final Setting setting;
 
 	/**
 	 * 构造
@@ -28,7 +28,7 @@ public class DbSetting {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param setting 数据库配置
 	 */
 	public DbSetting(Setting setting) {
@@ -41,13 +41,13 @@ public class DbSetting {
 
 	/**
 	 * 获得数据库连接信息
-	 * 
+	 *
 	 * @param group 分组
 	 * @return 分组
 	 */
 	public DbConfig getDbConfig(String group) {
 		final Setting config = setting.getSetting(group);
-		if (CollectionUtil.isEmpty(config)) {
+		if (MapUtil.isEmpty(config)) {
 			throw new DbRuntimeException("No Hutool pool config for group: [{}]", group);
 		}
 
@@ -70,6 +70,15 @@ public class DbSetting {
 		dbConfig.setMinIdle(setting.getInt("minIdle", group, 0));
 		dbConfig.setMaxActive(setting.getInt("maxActive", group, 8));
 		dbConfig.setMaxWait(setting.getLong("maxWait", group, 6000L));
+
+		// remarks等特殊配置，since 5.3.8
+		String connValue;
+		for (String key : DSFactory.KEY_CONN_PROPS) {
+			connValue = config.get(key);
+			if(StrUtil.isNotBlank(connValue)){
+				dbConfig.addConnProps(key, connValue);
+			}
+		}
 
 		return dbConfig;
 	}

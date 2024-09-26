@@ -1,13 +1,12 @@
 package cn.hutool.extra.ssh;
 
+import cn.hutool.core.lang.SimpleCache;
 import cn.hutool.core.util.StrUtil;
 import com.jcraft.jsch.Session;
 
-import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Jsch会话池
@@ -20,11 +19,7 @@ public enum JschSessionPool {
 	/**
 	 * SSH会话池，key：host，value：Session对象
 	 */
-	private Map<String, Session> sessionPool = new ConcurrentHashMap<>();
-	/**
-	 * 锁
-	 */
-	private static final Object lock = new Object();
+	private final SimpleCache<String, Session> cache = new SimpleCache<>(new HashMap<>());
 
 	/**
 	 * 获取Session，不存在返回null
@@ -33,7 +28,7 @@ public enum JschSessionPool {
 	 * @return Session
 	 */
 	public Session get(String key) {
-		return sessionPool.get(key);
+		return cache.get(key);
 	}
 
 	/**
@@ -47,17 +42,7 @@ public enum JschSessionPool {
 	 */
 	public Session getSession(String sshHost, int sshPort, String sshUser, String sshPass) {
 		final String key = StrUtil.format("{}@{}:{}", sshUser, sshHost, sshPort);
-		Session session = get(key);
-		if (null == session || false == session.isConnected()) {
-			synchronized (lock) {
-				session = get(key);
-				if (null == session || false == session.isConnected()) {
-					session = JschUtil.openSession(sshHost, sshPort, sshUser, sshPass);
-					put(key, session);
-				}
-			}
-		}
-		return session;
+		return this.cache.get(key, Session::isConnected, ()-> JschUtil.openSession(sshHost, sshPort, sshUser, sshPass));
 	}
 
 	/**
@@ -72,17 +57,23 @@ public enum JschSessionPool {
 	 */
 	public Session getSession(String sshHost, int sshPort, String sshUser, String prvkey, byte[] passphrase) {
 		final String key = StrUtil.format("{}@{}:{}", sshUser, sshHost, sshPort);
-		Session session = get(key);
-		if (null == session || false == session.isConnected()) {
-			synchronized (lock) {
-				session = get(key);
-				if (null == session || false == session.isConnected()) {
-					session = JschUtil.openSession(sshHost, sshPort, sshUser, prvkey, passphrase);
-					put(key, session);
-				}
-			}
-		}
-		return session;
+		return this.cache.get(key, Session::isConnected, ()->JschUtil.openSession(sshHost, sshPort, sshUser, prvkey, passphrase));
+	}
+
+	/**
+	 * 获得一个SSH跳板机会话，重用已经使用的会话
+	 *
+	 * @param sshHost    跳板机主机
+	 * @param sshPort    跳板机端口
+	 * @param sshUser    跳板机用户名
+	 * @param prvkey     跳板机私钥内容
+	 * @param passphrase 跳板机私钥密码
+	 * @return SSH会话
+	 * @since 5.8.18
+	 */
+	public Session getSession(String sshHost, int sshPort, String sshUser, byte[] prvkey, byte[] passphrase) {
+		final String key = StrUtil.format("{}@{}:{}", sshUser, sshHost, sshPort);
+		return this.cache.get(key, Session::isConnected, ()->JschUtil.openSession(sshHost, sshPort, sshUser, prvkey, passphrase));
 	}
 
 	/**
@@ -92,7 +83,7 @@ public enum JschSessionPool {
 	 * @param session Session
 	 */
 	public void put(String key, Session session) {
-		this.sessionPool.put(key, session);
+		this.cache.put(key, session);
 	}
 
 	/**
@@ -101,11 +92,11 @@ public enum JschSessionPool {
 	 * @param key 主机，格式为user@host:port
 	 */
 	public void close(String key) {
-		Session session = sessionPool.get(key);
+		Session session = get(key);
 		if (session != null && session.isConnected()) {
 			session.disconnect();
 		}
-		sessionPool.remove(key);
+		this.cache.remove(key);
 	}
 
 	/**
@@ -116,7 +107,7 @@ public enum JschSessionPool {
 	 */
 	public void remove(Session session) {
 		if (null != session) {
-			final Iterator<Entry<String, Session>> iterator = this.sessionPool.entrySet().iterator();
+			final Iterator<Entry<String, Session>> iterator = this.cache.iterator();
 			Entry<String, Session> entry;
 			while (iterator.hasNext()) {
 				entry = iterator.next();
@@ -132,12 +123,13 @@ public enum JschSessionPool {
 	 * 关闭所有SSH连接会话
 	 */
 	public void closeAll() {
-		Collection<Session> sessions = sessionPool.values();
-		for (Session session : sessions) {
-			if (session.isConnected()) {
+		Session session;
+		for (Entry<String, Session> entry : this.cache) {
+			session = entry.getValue();
+			if (session != null && session.isConnected()) {
 				session.disconnect();
 			}
 		}
-		sessionPool.clear();
+		cache.clear();
 	}
 }

@@ -18,8 +18,8 @@ public class CsvData implements Iterable<CsvRow>, Serializable {
 
 	/**
 	 * 构造
-	 * 
-	 * @param header 头信息
+	 *
+	 * @param header 头信息, 可以为null
 	 * @param rows 行
 	 */
 	public CsvData(final List<String> header, final List<CsvRow> rows) {
@@ -42,6 +42,9 @@ public class CsvData implements Iterable<CsvRow>, Serializable {
 	 * @return the header row - might be {@code null} if no header exists
 	 */
 	public List<String> getHeader() {
+		if(null == this.header){
+			return null;
+		}
 		return Collections.unmodifiableList(this.header);
 	}
 
@@ -58,7 +61,7 @@ public class CsvData implements Iterable<CsvRow>, Serializable {
 
 	/**
 	 * 获取所有行
-	 * 
+	 *
 	 * @return 所有行
 	 */
 	public List<CsvRow> getRows() {
@@ -68,5 +71,13 @@ public class CsvData implements Iterable<CsvRow>, Serializable {
 	@Override
 	public Iterator<CsvRow> iterator() {
 		return this.rows.iterator();
+	}
+
+	@Override
+	public String toString() {
+		return "CsvData{" +
+				"header=" + header +
+				", rows=" + rows +
+				'}';
 	}
 }

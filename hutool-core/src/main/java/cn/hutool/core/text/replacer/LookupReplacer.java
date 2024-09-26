@@ -1,15 +1,15 @@
 package cn.hutool.core.text.replacer;
 
+import cn.hutool.core.text.StrBuilder;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import cn.hutool.core.text.StrBuilder;
-
 /**
  * 查找替换器，通过查找指定关键字，替换对应的值
- * 
+ *
  * @author looly
  * @since 4.1.5
  */
@@ -23,12 +23,12 @@ public class LookupReplacer extends StrReplacer {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param lookup 被查找的键值对
 	 */
 	public LookupReplacer(String[]... lookup) {
-		this.lookupMap = new HashMap<String, String>();
-		this.prefixSet = new HashSet<Character>();
+		this.lookupMap = new HashMap<>();
+		this.prefixSet = new HashSet<>();
 
 		int minLength = Integer.MAX_VALUE;
 		int maxLength = 0;

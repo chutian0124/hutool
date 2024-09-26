@@ -4,16 +4,12 @@ import cn.hutool.core.collection.IterUtil;
 import cn.hutool.core.comparator.CompareUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.exceptions.UtilException;
-import cn.hutool.core.io.FastByteArrayOutputStream;
-import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.map.MapUtil;
 
-import java.io.ByteArrayInputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * 对象工具类，包括判空、克隆、序列化等操作
@@ -23,13 +19,32 @@ import java.util.*;
 public class ObjectUtil {
 
 	/**
+	 * 比较两个对象是否相等，此方法是 {@link #equal(Object, Object)}的别名方法。<br>
+	 * 相同的条件有两个，满足其一即可：<br>
+	 * <ol>
+	 * <li>obj1 == null &amp;&amp; obj2 == null</li>
+	 * <li>obj1.equals(obj2)</li>
+	 * <li>如果是BigDecimal比较，0 == obj1.compareTo(obj2)</li>
+	 * </ol>
+	 *
+	 * @param obj1 对象1
+	 * @param obj2 对象2
+	 * @return 是否相等
+	 * @see #equal(Object, Object)
+	 * @since 5.4.3
+	 */
+	public static boolean equals(Object obj1, Object obj2) {
+		return equal(obj1, obj2);
+	}
+
+	/**
 	 * 比较两个对象是否相等。<br>
 	 * 相同的条件有两个，满足其一即可：<br>
 	 * <ol>
 	 * <li>obj1 == null &amp;&amp; obj2 == null</li>
 	 * <li>obj1.equals(obj2)</li>
+	 * <li>如果是BigDecimal比较，0 == obj1.compareTo(obj2)</li>
 	 * </ol>
-	 * 1. obj1 == null &amp;&amp; obj2 == null 2. obj1.equals(obj2)
 	 *
 	 * @param obj1 对象1
 	 * @param obj2 对象2
@@ -37,7 +52,9 @@ public class ObjectUtil {
 	 * @see Objects#equals(Object, Object)
 	 */
 	public static boolean equal(Object obj1, Object obj2) {
-		// return (obj1 != null) ? (obj1.equals(obj2)) : (obj2 == null);
+		if (obj1 instanceof Number && obj2 instanceof Number) {
+			return NumberUtil.equals((Number) obj1, (Number) obj2);
+		}
 		return Objects.equals(obj1, obj2);
 	}
 
@@ -83,7 +100,7 @@ public class ObjectUtil {
 
 		int count;
 		if (obj instanceof Iterator) {
-			Iterator<?> iter = (Iterator<?>) obj;
+			final Iterator<?> iter = (Iterator<?>) obj;
 			count = 0;
 			while (iter.hasNext()) {
 				count++;
@@ -92,7 +109,7 @@ public class ObjectUtil {
 			return count;
 		}
 		if (obj instanceof Enumeration) {
-			Enumeration<?> enumeration = (Enumeration<?>) obj;
+			final Enumeration<?> enumeration = (Enumeration<?>) obj;
 			count = 0;
 			while (enumeration.hasMoreElements()) {
 				count++;
@@ -140,9 +157,9 @@ public class ObjectUtil {
 		}
 
 		if (obj instanceof Iterator) {
-			Iterator<?> iter = (Iterator<?>) obj;
+			final Iterator<?> iter = (Iterator<?>) obj;
 			while (iter.hasNext()) {
-				Object o = iter.next();
+				final Object o = iter.next();
 				if (equal(o, element)) {
 					return true;
 				}
@@ -150,9 +167,9 @@ public class ObjectUtil {
 			return false;
 		}
 		if (obj instanceof Enumeration) {
-			Enumeration<?> enumeration = (Enumeration<?>) obj;
+			final Enumeration<?> enumeration = (Enumeration<?>) obj;
 			while (enumeration.hasMoreElements()) {
-				Object o = enumeration.nextElement();
+				final Object o = enumeration.nextElement();
 				if (equal(o, element)) {
 					return true;
 				}
@@ -160,9 +177,9 @@ public class ObjectUtil {
 			return false;
 		}
 		if (obj.getClass().isArray() == true) {
-			int len = Array.getLength(obj);
+			final int len = Array.getLength(obj);
 			for (int i = 0; i < len; i++) {
-				Object o = Array.get(obj, i);
+				final Object o = Array.get(obj, i);
 				if (equal(o, element)) {
 					return true;
 				}
@@ -184,16 +201,22 @@ public class ObjectUtil {
 	 * @return 是否为null
 	 */
 	public static boolean isNull(Object obj) {
+		//noinspection ConstantConditions
 		return null == obj || obj.equals(null);
 	}
 
 	/**
 	 * 检查对象是否不为null
+	 * <pre>
+	 * 1. != null
+	 * 2. not equals(null)
+	 * </pre>
 	 *
 	 * @param obj 对象
-	 * @return 是否为null
+	 * @return 是否为非null
 	 */
 	public static boolean isNotNull(Object obj) {
+		//noinspection ConstantConditions
 		return null != obj && false == obj.equals(null);
 	}
 
@@ -270,14 +293,231 @@ public class ObjectUtil {
 	 * @since 3.0.7
 	 */
 	public static <T> T defaultIfNull(final T object, final T defaultValue) {
-		return (null != object) ? object : defaultValue;
+		return isNull(object) ? defaultValue : object;
+	}
+
+	/**
+	 * 如果被检查对象为 {@code null}， 返回默认值（由 defaultValueSupplier 提供）；否则直接返回
+	 *
+	 * @param source               被检查对象
+	 * @param defaultValueSupplier 默认值提供者
+	 * @param <T>                  对象类型
+	 * @return 被检查对象为{@code null}返回默认值，否则返回自定义handle处理后的返回值
+	 * @throws NullPointerException {@code defaultValueSupplier == null} 时，抛出
+	 * @since 5.7.20
+	 */
+	public static <T> T defaultIfNull(T source, Supplier<? extends T> defaultValueSupplier) {
+		if (isNull(source)) {
+			return defaultValueSupplier.get();
+		}
+		return source;
+	}
+
+	/**
+	 * 如果被检查对象为 {@code null}， 返回默认值（由 defaultValueSupplier 提供）；否则直接返回
+	 *
+	 * @param source               被检查对象
+	 * @param defaultValueSupplier 默认值提供者
+	 * @param <T>                  对象类型
+	 * @return 被检查对象为{@code null}返回默认值，否则返回自定义handle处理后的返回值
+	 * @throws NullPointerException {@code defaultValueSupplier == null} 时，抛出
+	 * @since 5.7.20
+	 */
+	public static <T> T defaultIfNull(T source, Function<T, ? extends T> defaultValueSupplier) {
+		if (isNull(source)) {
+			return defaultValueSupplier.apply(null);
+		}
+		return source;
+	}
+
+	/**
+	 * 如果给定对象为{@code null} 返回默认值, 如果不为null 返回自定义handle处理后的返回值
+	 *
+	 * @param source       Object 类型对象
+	 * @param handle       非空时自定义的处理方法
+	 * @param defaultValue 默认为空的返回值
+	 * @param <T>          被检查对象为{@code null}返回默认值，否则返回自定义handle处理后的返回值
+	 * @return 处理后的返回值
+	 * @since 5.4.6
+	 * @deprecated 当str为{@code null}时，handle使用了str相关的方法引用会导致空指针问题
+	 */
+	@Deprecated
+	public static <T> T defaultIfNull(Object source, Supplier<? extends T> handle, final T defaultValue) {
+		if (isNotNull(source)) {
+			return handle.get();
+		}
+		return defaultValue;
+	}
+
+	/**
+	 * 如果给定对象为{@code null} 返回默认值, 如果不为null 返回自定义handle处理后的返回值
+	 *
+	 * @param <T>          被检查对象为{@code null}返回默认值，否则返回自定义handle处理后的返回值
+	 * @param <R>          被检查的对象类型
+	 * @param source       Object 类型对象
+	 * @param handle       非空时自定义的处理方法
+	 * @param defaultValue 默认为空的返回值
+	 * @return 处理后的返回值
+	 * @since 5.4.6
+	 */
+	public static <T, R> T defaultIfNull(R source, Function<R, ? extends T> handle, final T defaultValue) {
+		if (isNotNull(source)) {
+			return handle.apply(source);
+		}
+		return defaultValue;
+	}
+
+	/**
+	 * 如果给定对象为{@code null}或者""返回默认值, 否则返回自定义handle处理后的返回值
+	 *
+	 * @param str          String 类型
+	 * @param handle       自定义的处理方法
+	 * @param defaultValue 默认为空的返回值
+	 * @param <T>          被检查对象为{@code null}或者 ""返回默认值，否则返回自定义handle处理后的返回值
+	 * @return 处理后的返回值
+	 * @since 5.4.6
+	 * @deprecated 当str为{@code null}时，handle使用了str相关的方法引用会导致空指针问题
+	 */
+	@Deprecated
+	public static <T> T defaultIfEmpty(String str, Supplier<? extends T> handle, final T defaultValue) {
+		if (StrUtil.isNotEmpty(str)) {
+			return handle.get();
+		}
+		return defaultValue;
+	}
+
+	/**
+	 * 如果给定对象为{@code null}或者""返回默认值, 否则返回自定义handle处理后的返回值
+	 *
+	 * @param str          String 类型
+	 * @param handle       自定义的处理方法
+	 * @param defaultValue 默认为空的返回值
+	 * @param <T>          被检查对象为{@code null}或者 ""返回默认值，否则返回自定义handle处理后的返回值
+	 * @return 处理后的返回值
+	 * @since 5.4.6
+	 */
+	public static <T> T defaultIfEmpty(String str, Function<CharSequence, ? extends T> handle, final T defaultValue) {
+		if (StrUtil.isNotEmpty(str)) {
+			return handle.apply(str);
+		}
+		return defaultValue;
+	}
+
+	/**
+	 * 如果给定对象为{@code null}或者 "" 返回默认值
+	 *
+	 * <pre>
+	 * ObjectUtil.defaultIfEmpty(null, null)      = null
+	 * ObjectUtil.defaultIfEmpty(null, "")        = ""
+	 * ObjectUtil.defaultIfEmpty("", "zz")      = "zz"
+	 * ObjectUtil.defaultIfEmpty(" ", "zz")      = " "
+	 * ObjectUtil.defaultIfEmpty("abc", *)        = "abc"
+	 * </pre>
+	 *
+	 * @param <T>          对象类型（必须实现CharSequence接口）
+	 * @param str          被检查对象，可能为{@code null}
+	 * @param defaultValue 被检查对象为{@code null}或者 ""返回的默认值，可以为{@code null}或者 ""
+	 * @return 被检查对象为{@code null}或者 ""返回默认值，否则返回原值
+	 * @since 5.0.4
+	 */
+	public static <T extends CharSequence> T defaultIfEmpty(final T str, final T defaultValue) {
+		return StrUtil.isEmpty(str) ? defaultValue : str;
+	}
+
+	/**
+	 * 如果被检查对象为 {@code null} 或 "" 时，返回默认值（由 defaultValueSupplier 提供）；否则直接返回
+	 *
+	 * @param str                  被检查对象
+	 * @param defaultValueSupplier 默认值提供者
+	 * @param <T>                  对象类型（必须实现CharSequence接口）
+	 * @return 被检查对象为{@code null}返回默认值，否则返回自定义handle处理后的返回值
+	 * @throws NullPointerException {@code defaultValueSupplier == null} 时，抛出
+	 * @since 5.7.20
+	 */
+	public static <T extends CharSequence> T defaultIfEmpty(T str, Supplier<? extends T> defaultValueSupplier) {
+		if (StrUtil.isEmpty(str)) {
+			return defaultValueSupplier.get();
+		}
+		return str;
+	}
+
+	/**
+	 * 如果被检查对象为 {@code null} 或 "" 时，返回默认值（由 defaultValueSupplier 提供）；否则直接返回
+	 *
+	 * @param str                  被检查对象
+	 * @param defaultValueSupplier 默认值提供者
+	 * @param <T>                  对象类型（必须实现CharSequence接口）
+	 * @return 被检查对象为{@code null}返回默认值，否则返回自定义handle处理后的返回值
+	 * @throws NullPointerException {@code defaultValueSupplier == null} 时，抛出
+	 * @since 5.7.20
+	 */
+	public static <T extends CharSequence> T defaultIfEmpty(T str, Function<T, ? extends T> defaultValueSupplier) {
+		if (StrUtil.isEmpty(str)) {
+			return defaultValueSupplier.apply(null);
+		}
+		return str;
+	}
+
+	/**
+	 * 如果给定对象为{@code null}或者""或者空白符返回默认值
+	 *
+	 * <pre>
+	 * ObjectUtil.defaultIfBlank(null, null)      = null
+	 * ObjectUtil.defaultIfBlank(null, "")        = ""
+	 * ObjectUtil.defaultIfBlank("", "zz")      = "zz"
+	 * ObjectUtil.defaultIfBlank(" ", "zz")      = "zz"
+	 * ObjectUtil.defaultIfBlank("abc", *)        = "abc"
+	 * </pre>
+	 *
+	 * @param <T>          对象类型（必须实现CharSequence接口）
+	 * @param str          被检查对象，可能为{@code null}
+	 * @param defaultValue 被检查对象为{@code null}或者 ""或者空白符返回的默认值，可以为{@code null}或者 ""或者空白符
+	 * @return 被检查对象为{@code null}或者 ""或者空白符返回默认值，否则返回原值
+	 * @since 5.0.4
+	 */
+	public static <T extends CharSequence> T defaultIfBlank(final T str, final T defaultValue) {
+		return StrUtil.isBlank(str) ? defaultValue : str;
+	}
+
+	/**
+	 * 如果被检查对象为 {@code null} 或 "" 或 空白字符串时，返回默认值（由 defaultValueSupplier 提供）；否则直接返回
+	 *
+	 * @param str                  被检查对象
+	 * @param defaultValueSupplier 默认值提供者
+	 * @param <T>                  对象类型（必须实现CharSequence接口）
+	 * @return 被检查对象为{@code null}返回默认值，否则返回自定义handle处理后的返回值
+	 * @throws NullPointerException {@code defaultValueSupplier == null} 时，抛出
+	 * @since 5.7.20
+	 */
+	public static <T extends CharSequence> T defaultIfBlank(T str, Supplier<? extends T> defaultValueSupplier) {
+		if (StrUtil.isBlank(str)) {
+			return defaultValueSupplier.get();
+		}
+		return str;
+	}
+
+	/**
+	 * 如果被检查对象为 {@code null} 或 "" 或 空白字符串时，返回默认值（由 defaultValueSupplier 提供）；否则直接返回
+	 *
+	 * @param str                  被检查对象
+	 * @param defaultValueSupplier 默认值提供者
+	 * @param <T>                  对象类型（必须实现CharSequence接口）
+	 * @return 被检查对象为{@code null}返回默认值，否则返回自定义handle处理后的返回值
+	 * @throws NullPointerException {@code defaultValueSupplier == null} 时，抛出
+	 * @since 5.7.20
+	 */
+	public static <T extends CharSequence> T defaultIfBlank(T str, Function<T, ? extends T> defaultValueSupplier) {
+		if (StrUtil.isBlank(str)) {
+			return defaultValueSupplier.apply(null);
+		}
+		return str;
 	}
 
 	/**
 	 * 克隆对象<br>
 	 * 如果对象实现Cloneable接口，调用其clone方法<br>
 	 * 如果实现Serializable接口，执行深度克隆<br>
-	 * 否则返回<code>null</code>
+	 * 否则返回{@code null}
 	 *
 	 * @param <T> 对象类型
 	 * @param obj 被克隆对象
@@ -321,24 +561,8 @@ public class ObjectUtil {
 	 * @return 克隆后的对象
 	 * @throws UtilException IO异常和ClassNotFoundException封装
 	 */
-	@SuppressWarnings("unchecked")
 	public static <T> T cloneByStream(T obj) {
-		if (false == (obj instanceof Serializable)) {
-			return null;
-		}
-		final FastByteArrayOutputStream byteOut = new FastByteArrayOutputStream();
-		ObjectOutputStream out = null;
-		try {
-			out = new ObjectOutputStream(byteOut);
-			out.writeObject(obj);
-			out.flush();
-			final ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(byteOut.toByteArray()));
-			return (T) in.readObject();
-		} catch (Exception e) {
-			throw new UtilException(e);
-		} finally {
-			IoUtil.close(out);
-		}
+		return SerializeUtil.clone(obj);
 	}
 
 	/**
@@ -350,65 +574,37 @@ public class ObjectUtil {
 	 * @return 序列化后的字节码
 	 */
 	public static <T> byte[] serialize(T obj) {
-		if (false == (obj instanceof Serializable)) {
-			return null;
-		}
-
-		FastByteArrayOutputStream byteOut = new FastByteArrayOutputStream();
-		ObjectOutputStream oos = null;
-		try {
-			oos = new ObjectOutputStream(byteOut);
-			oos.writeObject(obj);
-			oos.flush();
-		} catch (Exception e) {
-			throw new UtilException(e);
-		} finally {
-			IoUtil.close(oos);
-		}
-		return byteOut.toByteArray();
+		return SerializeUtil.serialize(obj);
 	}
 
 	/**
 	 * 反序列化<br>
 	 * 对象必须实现Serializable接口
 	 *
-	 * @param <T>   对象类型
-	 * @param bytes 反序列化的字节码
-	 * @return 反序列化后的对象
-	 * @see #unserialize(byte[])
-	 */
-	public static <T> T deserialize(byte[] bytes) {
-		return unserialize(bytes);
-	}
-
-	/**
-	 * 反序列化<br>
-	 * 对象必须实现Serializable接口
+	 * <p>
+	 * 注意！！！ 此方法不会检查反序列化安全，可能存在反序列化漏洞风险！！！
+	 * </p>
 	 *
 	 * @param <T>   对象类型
 	 * @param bytes 反序列化的字节码
+	 * @param acceptClasses 白名单的类
 	 * @return 反序列化后的对象
 	 */
-	@SuppressWarnings("unchecked")
-	public static <T> T unserialize(byte[] bytes) {
-		ObjectInputStream ois;
-		try {
-			ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-			ois = new ObjectInputStream(bais);
-			return (T) ois.readObject();
-		} catch (Exception e) {
-			throw new UtilException(e);
-		}
+	public static <T> T deserialize(byte[] bytes, Class<?>... acceptClasses) {
+		return SerializeUtil.deserialize(bytes, acceptClasses);
 	}
 
 	/**
 	 * 是否为基本类型，包括包装类型和非包装类型
 	 *
-	 * @param object 被检查对象
+	 * @param object 被检查对象，{@code null}返回{@code false}
 	 * @return 是否为基本类型
 	 * @see ClassUtil#isBasicType(Class)
 	 */
 	public static boolean isBasicType(Object object) {
+		if (null == object) {
+			return false;
+		}
 		return ClassUtil.isBasicType(object.getClass());
 	}
 
@@ -513,17 +709,30 @@ public class ObjectUtil {
 	}
 
 	/**
+	 * 是否存在{@code null}对象，通过{@link ObjectUtil#isNull(Object)} 判断元素
+	 *
+	 * @param objs 被检查对象
+	 * @return 是否存在
+	 * @see ArrayUtil#hasNull(Object[])
+	 * @since 5.5.3
+	 */
+	public static boolean hasNull(Object... objs) {
+		return ArrayUtil.hasNull(objs);
+	}
+
+	/**
 	 * 是否存在{@code null}或空对象，通过{@link ObjectUtil#isEmpty(Object)} 判断元素
 	 *
 	 * @param objs 被检查对象
 	 * @return 是否存在
+	 * @see ArrayUtil#hasEmpty(Object...)
 	 */
 	public static boolean hasEmpty(Object... objs) {
 		return ArrayUtil.hasEmpty(objs);
 	}
 
 	/**
-	 * 是否存都为{@code null}或空对象，通过{@link ObjectUtil#isEmpty(Object)} 判断元素
+	 * 是否全都为{@code null}或空对象，通过{@link ObjectUtil#isEmpty(Object)} 判断元素
 	 *
 	 * @param objs 被检查的对象,一个或者多个
 	 * @return 是否都为空
@@ -533,7 +742,7 @@ public class ObjectUtil {
 	}
 
 	/**
-	 * 是否存都不为{@code null}或空对象，通过{@link ObjectUtil#isEmpty(Object)} 判断元素
+	 * 是否全都不为{@code null}或空对象，通过{@link ObjectUtil#isEmpty(Object)} 判断元素
 	 *
 	 * @param objs 被检查的对象,一个或者多个
 	 * @return 是否都不为空

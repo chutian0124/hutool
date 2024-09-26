@@ -1,18 +1,17 @@
 package cn.hutool.core.lang;
 
-import java.io.File;
-import java.io.FileFilter;
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.util.List;
-
 import cn.hutool.core.exceptions.UtilException;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.ClassUtil;
 import cn.hutool.core.util.ReflectUtil;
 import cn.hutool.core.util.URLUtil;
+
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.List;
 
 /**
  * 外部Jar的类加载器
@@ -60,7 +59,7 @@ public class JarClassLoader extends URLClassLoader {
 				method.setAccessible(true);
 				final List<File> jars = loopJar(jarFile);
 				for (File jar : jars) {
-					ReflectUtil.invoke(loader, method, new Object[]{jar.toURI().toURL()});
+					ReflectUtil.invoke(loader, method, jar.toURI().toURL());
 				}
 			}
 		} catch (IOException e) {
@@ -96,6 +95,16 @@ public class JarClassLoader extends URLClassLoader {
 	 */
 	public JarClassLoader(URL[] urls) {
 		super(urls, ClassUtil.getClassLoader());
+	}
+
+	/**
+	 * 构造
+	 *
+	 * @param urls        被加载的URL
+	 * @param classLoader 类加载器
+	 */
+	public JarClassLoader(URL[] urls, ClassLoader classLoader) {
+		super(urls, classLoader);
 	}
 	// ------------------------------------------------------------------- Constructor end
 
@@ -143,12 +152,7 @@ public class JarClassLoader extends URLClassLoader {
 	 * @return jar文件列表
 	 */
 	private static List<File> loopJar(File file) {
-		return FileUtil.loopFiles(file, new FileFilter() {
-			@Override
-			public boolean accept(File file) {
-				return isJarFile(file);
-			}
-		});
+		return FileUtil.loopFiles(file, JarClassLoader::isJarFile);
 	}
 
 	/**

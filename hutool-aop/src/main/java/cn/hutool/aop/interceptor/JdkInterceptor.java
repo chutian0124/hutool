@@ -18,8 +18,8 @@ import java.lang.reflect.Method;
 public class JdkInterceptor implements InvocationHandler, Serializable {
 	private static final long serialVersionUID = 1L;
 
-	private Object target;
-	private Aspect aspect;
+	private final Object target;
+	private final Aspect aspect;
 
 	/**
 	 * 构造
@@ -54,12 +54,13 @@ public class JdkInterceptor implements InvocationHandler, Serializable {
 					throw e;
 				}
 			}
+
+			// 结束执行回调
+			if (aspect.after(target, method, args, result)) {
+				return result;
+			}
 		}
 
-		// 结束执行回调
-		if (aspect.after(target, method, args, result)) {
-			return result;
-		}
 		return null;
 	}
 

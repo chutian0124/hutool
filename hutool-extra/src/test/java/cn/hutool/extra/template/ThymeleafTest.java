@@ -1,5 +1,15 @@
 package cn.hutool.extra.template;
 
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.lang.Dict;
+import cn.hutool.extra.template.engine.thymeleaf.ThymeleafEngine;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.standard.StandardDialect;
+import org.thymeleaf.templateresolver.StringTemplateResolver;
+
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -8,22 +18,27 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.junit.Assert;
-import org.junit.Test;
-import org.thymeleaf.context.Context;
-import org.thymeleaf.templateresolver.StringTemplateResolver;
-
-import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.lang.Dict;
-import cn.hutool.extra.template.engine.thymeleaf.ThymeleafEngine;
-
 /**
  * Thymeleaf单元测试
- * 
+ *
  * @author looly
  *
  */
 public class ThymeleafTest {
+
+	/**
+	 * <a href="https://github.com/dromara/hutool/issues/2530">...</a>
+	 * 自定义操作原始引擎
+	 */
+	@Test
+	@Disabled
+	public void addDialectTest(){
+		final TemplateEngine engine = TemplateUtil.createEngine();
+		if(engine instanceof ThymeleafEngine){
+			final org.thymeleaf.TemplateEngine rawEngine = ((ThymeleafEngine) engine).getRawEngine();
+			rawEngine.addDialect(new StandardDialect());
+		}
+	}
 
 	@Test
 	public void thymeleafEngineTest() {
@@ -46,7 +61,7 @@ public class ThymeleafTest {
 		TemplateEngine engine = new ThymeleafEngine(new TemplateConfig());
 		Template template = engine.getTemplate("<h3 th:each=\"item : ${list}\" th:text=\"${item.name}\"></h3>");
 		String render = template.render(Dict.create().set("list", list));
-		Assert.assertEquals("<h3>a</h3><h3>b</h3><h3>2019-01-01 00:00:00</h3>", render);
+		assertEquals("<h3>a</h3><h3>b</h3><h3>2019-01-01 00:00:00</h3>", render);
 	}
 
 	@Test
@@ -83,7 +98,7 @@ public class ThymeleafTest {
 		Context context = new Context(Locale.getDefault(), map);
 		templateEngine.process("<h3 th:each=\"item : ${list}\" th:text=\"${item.name}\"></h3>", context, writer);
 
-		Assert.assertEquals("<h3>a</h3><h3>b</h3><h3>2019-01-01 00:00:00</h3>", writer.toString());
+		assertEquals("<h3>a</h3><h3>b</h3><h3>2019-01-01 00:00:00</h3>", writer.toString());
 	}
 
 	@SuppressWarnings("rawtypes")
@@ -94,6 +109,6 @@ public class ThymeleafTest {
 		Template template = engine.getTemplate("<h3 th:each=\"item : ${list}\" th:text=\"${item.name}\"></h3>");
 		// "<h3 th:text=\"${nestMap.nestKey}\"></h3>"
 		String render = template.render(map);
-		Assert.assertEquals("<h3>a</h3><h3>b</h3><h3>2019-01-01 00:00:00</h3>", render);
+		assertEquals("<h3>a</h3><h3>b</h3><h3>2019-01-01 00:00:00</h3>", render);
 	}
 }

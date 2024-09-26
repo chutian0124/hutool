@@ -1,13 +1,15 @@
 package cn.hutool.core.util;
 
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.lang.Assert;
+import cn.hutool.core.lang.func.Func1;
+import cn.hutool.core.lang.func.LambdaUtil;
 import cn.hutool.core.map.MapUtil;
+
+import java.lang.reflect.Field;
+import java.util.*;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * 枚举工具类
@@ -24,8 +26,7 @@ public class EnumUtil {
 	 * @return 是否为Enum类
 	 */
 	public static boolean isEnum(Class<?> clazz) {
-		Assert.notNull(clazz);
-		return clazz.isEnum();
+		return Assert.notNull(clazz).isEnum();
 	}
 
 	/**
@@ -35,8 +36,7 @@ public class EnumUtil {
 	 * @return 是否为Enum类
 	 */
 	public static boolean isEnum(Object obj) {
-		Assert.notNull(obj);
-		return obj.getClass().isEnum();
+		return Assert.notNull(obj).getClass().isEnum();
 	}
 
 	/**
@@ -51,6 +51,27 @@ public class EnumUtil {
 	}
 
 	/**
+	 * 获取给定位置的枚举值
+	 *
+	 * @param <E>       枚举类型泛型
+	 * @param enumClass 枚举类
+	 * @param index     枚举索引
+	 * @return 枚举值，null表示无此对应枚举
+	 * @since 5.1.6
+	 */
+	public static <E extends Enum<E>> E getEnumAt(Class<E> enumClass, int index) {
+		if(null == enumClass){
+			return null;
+		}
+		final E[] enumConstants = enumClass.getEnumConstants();
+		if(index < 0){
+			index = enumConstants.length + index;
+		}
+
+		return index >= 0 && index < enumConstants.length ? enumConstants[index] : null;
+	}
+
+	/**
 	 * 字符串转枚举，调用{@link Enum#valueOf(Class, String)}
 	 *
 	 * @param <E>       枚举类型泛型
@@ -60,6 +81,9 @@ public class EnumUtil {
 	 * @since 4.1.13
 	 */
 	public static <E extends Enum<E>> E fromString(Class<E> enumClass, String value) {
+		if (null == enumClass || StrUtil.isBlank(value)) {
+			return null;
+		}
 		return Enum.valueOf(enumClass, value);
 	}
 
@@ -88,10 +112,6 @@ public class EnumUtil {
 	 * @since 4.5.18
 	 */
 	public static <E extends Enum<E>> E fromStringQuietly(Class<E> enumClass, String value) {
-		if (null == enumClass || StrUtil.isBlank(value)) {
-			return null;
-		}
-
 		try {
 			return fromString(enumClass, value);
 		} catch (IllegalArgumentException e) {
@@ -109,6 +129,9 @@ public class EnumUtil {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <E extends Enum<E>> E likeValueOf(Class<E> enumClass, Object value) {
+		if(null == enumClass || null == value){
+			return null;
+		}
 		if (value instanceof CharSequence) {
 			value = value.toString().trim();
 		}
@@ -138,6 +161,9 @@ public class EnumUtil {
 	 * @return name列表
 	 */
 	public static List<String> getNames(Class<? extends Enum<?>> clazz) {
+		if(null == clazz){
+			return null;
+		}
 		final Enum<?>[] enums = clazz.getEnumConstants();
 		if (null == enums) {
 			return null;
@@ -157,6 +183,9 @@ public class EnumUtil {
 	 * @return 字段值列表
 	 */
 	public static List<Object> getFieldValues(Class<? extends Enum<?>> clazz, String fieldName) {
+		if(null == clazz || StrUtil.isBlank(fieldName)){
+			return null;
+		}
 		final Enum<?>[] enums = clazz.getEnumConstants();
 		if (null == enums) {
 			return null;
@@ -181,6 +210,9 @@ public class EnumUtil {
 	 * @since 4.1.20
 	 */
 	public static List<String> getFieldNames(Class<? extends Enum<?>> clazz) {
+		if(null == clazz){
+			return null;
+		}
 		final List<String> names = new ArrayList<>();
 		final Field[] fields = ReflectUtil.getFields(clazz);
 		String name;
@@ -197,6 +229,84 @@ public class EnumUtil {
 	}
 
 	/**
+	 * 通过 某字段对应值 获取 枚举，获取不到时为 {@code null}
+	 *
+	 * @param enumClass 枚举类
+	 * @param predicate 条件
+	 * @param <E>       枚举类型
+	 * @return 对应枚举 ，获取不到时为 {@code null}
+	 * @since 5.8.0
+	 */
+	public static <E extends Enum<E>> E getBy(Class<E> enumClass, Predicate<? super E> predicate) {
+		if(null == enumClass || null == predicate){
+			return null;
+		}
+		return Arrays.stream(enumClass.getEnumConstants())
+			.filter(predicate).findFirst().orElse(null);
+	}
+
+	/**
+	 * 通过 某字段对应值 获取 枚举，获取不到时为 {@code null}
+	 *
+	 * @param condition 条件字段，为{@code null}返回{@code null}
+	 * @param value     条件字段值
+	 * @param <E>       枚举类型
+	 * @param <C>       字段类型
+	 * @return 对应枚举 ，获取不到时为 {@code null}
+	 */
+	public static <E extends Enum<E>, C> E getBy(Func1<E, C> condition, C value) {
+		if (null == condition) {
+			return null;
+		}
+		final Class<E> implClass = LambdaUtil.getRealClass(condition);
+		return Arrays.stream(implClass.getEnumConstants())
+			.filter(constant -> ObjUtil.equals(condition.callWithRuntimeException(constant), value))
+			.findAny()
+			.orElse(null);
+	}
+
+	/**
+	 * 通过 某字段对应值 获取 枚举，获取不到时为 {@code defaultEnum}
+	 *
+	 * @param <E>         枚举类型
+	 * @param <C>         字段类型
+	 * @param condition   条件字段
+	 * @param value       条件字段值
+	 * @param defaultEnum 条件找不到则返回结果使用这个
+	 * @return 对应枚举 ，获取不到时为 {@code null}
+	 * @since 5.8.8
+	 */
+	public static <E extends Enum<E>, C> E getBy(Func1<E, C> condition, C value, E defaultEnum) {
+		return ObjectUtil.defaultIfNull(getBy(condition, value), defaultEnum);
+	}
+
+	/**
+	 * 通过 某字段对应值 获取 枚举中另一字段值，获取不到时为 {@code null}
+	 *
+	 * @param field     你想要获取的字段，{@code null}返回{@code null}
+	 * @param condition 条件字段，{@code null}返回{@code null}
+	 * @param value     条件字段值
+	 * @param <E>       枚举类型
+	 * @param <F>       想要获取的字段类型
+	 * @param <C>       条件字段类型
+	 * @return 对应枚举中另一字段值 ，获取不到时为 {@code null}
+	 * @since 5.8.0
+	 */
+	public static <E extends Enum<E>, F, C> F getFieldBy(Func1<E, F> field, Function<E, C> condition, C value) {
+		if(null == field || null == condition){
+			return null;
+		}
+		final Class<E> implClass = LambdaUtil.getRealClass(field);
+		return Arrays.stream(implClass.getEnumConstants())
+			// 过滤
+			.filter(constant -> ObjUtil.equals(condition.apply(constant), value))
+			// 获取第一个并转换为结果
+			.findFirst()
+			.map(field::callWithRuntimeException)
+			.orElse(null);
+	}
+
+	/**
 	 * 获取枚举字符串值和枚举对象的Map对应，使用LinkedHashMap保证有序<br>
 	 * 结果中键为枚举名，值为枚举对象
 	 *
@@ -206,7 +316,10 @@ public class EnumUtil {
 	 * @since 4.0.2
 	 */
 	public static <E extends Enum<E>> LinkedHashMap<String, E> getEnumMap(final Class<E> enumClass) {
-		final LinkedHashMap<String, E> map = new LinkedHashMap<String, E>();
+		if(null == enumClass){
+			return null;
+		}
+		final LinkedHashMap<String, E> map = new LinkedHashMap<>();
 		for (final E e : enumClass.getEnumConstants()) {
 			map.put(e.name(), e);
 		}
@@ -222,11 +335,14 @@ public class EnumUtil {
 	 * @return 枚举名对应指定字段值的Map
 	 */
 	public static Map<String, Object> getNameFieldMap(Class<? extends Enum<?>> clazz, String fieldName) {
+		if(null == clazz || StrUtil.isBlank(fieldName)){
+			return null;
+		}
 		final Enum<?>[] enums = clazz.getEnumConstants();
 		if (null == enums) {
 			return null;
 		}
-		final Map<String, Object> map = MapUtil.newHashMap(enums.length);
+		final Map<String, Object> map = MapUtil.newHashMap(enums.length, true);
 		for (Enum<?> e : enums) {
 			map.put(e.name(), ReflectUtil.getFieldValue(e, fieldName));
 		}
@@ -242,13 +358,17 @@ public class EnumUtil {
 	 * @return 是否存在
 	 */
 	public static <E extends Enum<E>> boolean contains(final Class<E> enumClass, String val) {
-		return EnumUtil.getEnumMap(enumClass).containsKey(val);
+		final LinkedHashMap<String, E> enumMap = getEnumMap(enumClass);
+		if(CollUtil.isEmpty(enumMap)){
+			return false;
+		}
+		return enumMap.containsKey(val);
 	}
 
 	/**
 	 * 判断某个值是不存在枚举中
 	 *
-	 * @param <E> 枚举类型
+	 * @param <E>       枚举类型
 	 * @param enumClass 枚举类
 	 * @param val       需要查找的值
 	 * @return 是否不存在

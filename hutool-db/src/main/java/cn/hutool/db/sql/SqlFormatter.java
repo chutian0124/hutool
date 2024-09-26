@@ -1,5 +1,7 @@
 package cn.hutool.db.sql;
 
+import cn.hutool.core.util.StrUtil;
+
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Set;
@@ -7,6 +9,7 @@ import java.util.StringTokenizer;
 
 /**
  * SQL格式化器 from Hibernate
+ *
  * @author looly
  */
 public class SqlFormatter {
@@ -16,7 +19,7 @@ public class SqlFormatter {
 	private static final Set<String> QUANTIFIERS = new HashSet<>();
 	private static final Set<String> DML = new HashSet<>();
 	private static final Set<String> MISC = new HashSet<>();
-	
+
 	static {
 		BEGIN_CLAUSES.add("left");
 		BEGIN_CLAUSES.add("right");
@@ -24,7 +27,7 @@ public class SqlFormatter {
 		BEGIN_CLAUSES.add("outer");
 		BEGIN_CLAUSES.add("group");
 		BEGIN_CLAUSES.add("order");
-		
+
 		END_CLAUSES.add("where");
 		END_CLAUSES.add("set");
 		END_CLAUSES.add("having");
@@ -33,48 +36,48 @@ public class SqlFormatter {
 		END_CLAUSES.add("by");
 		END_CLAUSES.add("into");
 		END_CLAUSES.add("union");
-		
+
 		LOGICAL.add("and");
 		LOGICAL.add("or");
 		LOGICAL.add("when");
 		LOGICAL.add("else");
 		LOGICAL.add("end");
-		
+
 		QUANTIFIERS.add("in");
 		QUANTIFIERS.add("all");
 		QUANTIFIERS.add("exists");
 		QUANTIFIERS.add("some");
 		QUANTIFIERS.add("any");
-		
+
 		DML.add("insert");
 		DML.add("update");
 		DML.add("delete");
-		
+
 		MISC.add("select");
 		MISC.add("on");
 	}
-	
+
 	private static final String indentString = "    ";
 	private static final String initial = "\n    ";
 
 	public static String format(String source) {
 		return new FormatProcess(source).perform().trim();
 	}
-	
+
 	//------------------------------------------------------------------------------------------------
 
 	private static class FormatProcess {
 		boolean beginLine = true;
 		boolean afterBeginBeforeEnd = false;
 		boolean afterByOrSetOrFromOrSelect = false;
-//		boolean afterValues = false;
+		//		boolean afterValues = false;
 		boolean afterOn = false;
 		boolean afterBetween = false;
 		boolean afterInsert = false;
 		int inFunction = 0;
 		int parensSinceSelect = 0;
-		private LinkedList<Integer> parenCounts = new LinkedList<>();
-		private LinkedList<Boolean> afterByOrFromOrSelects = new LinkedList<>();
+		private final LinkedList<Integer> parenCounts = new LinkedList<>();
+		private final LinkedList<Boolean> afterByOrFromOrSelects = new LinkedList<>();
 
 		int indent = 1;
 
@@ -107,6 +110,12 @@ public class SqlFormatter {
 						t = this.tokens.nextToken();
 						this.token += t;
 					} while (!"\"".equals(t));
+				} else if ("`".equals(this.token)) {
+					String t;
+					do {
+						t = this.tokens.nextToken();
+						this.token += t;
+					} while (!"`".equals(t));
 				}
 
 				if ((this.afterByOrSetOrFromOrSelect) && (",".equals(this.token))) {
@@ -129,7 +138,7 @@ public class SqlFormatter {
 					values();
 				} else if ("on".equals(this.lcToken)) {
 					on();
-				} else if ((this.afterBetween) && (this.lcToken.equals("and"))) {
+				} else if ((this.afterBetween) && ("and".equals(this.lcToken))) {
 					misc();
 					this.afterBetween = false;
 				} else if (LOGICAL.contains(this.lcToken)) {
@@ -216,8 +225,8 @@ public class SqlFormatter {
 			out();
 			this.indent += 1;
 			newline();
-			this.parenCounts.addLast(new Integer(this.parensSinceSelect));
-			this.afterByOrFromOrSelects.addLast(Boolean.valueOf(this.afterByOrSetOrFromOrSelect));
+			this.parenCounts.addLast(this.parensSinceSelect);
+			this.afterByOrFromOrSelects.addLast(this.afterByOrSetOrFromOrSelect);
 			this.parensSinceSelect = 0;
 			this.afterByOrSetOrFromOrSelect = true;
 		}
@@ -271,19 +280,18 @@ public class SqlFormatter {
 			this.parensSinceSelect -= 1;
 			if (this.parensSinceSelect < 0) {
 				this.indent -= 1;
-				this.parensSinceSelect = ((Integer) this.parenCounts.removeLast()).intValue();
-				this.afterByOrSetOrFromOrSelect = ((Boolean) this.afterByOrFromOrSelects.removeLast()).booleanValue();
+				this.parensSinceSelect = this.parenCounts.removeLast();
+				this.afterByOrSetOrFromOrSelect = this.afterByOrFromOrSelects.removeLast();
 			}
 			if (this.inFunction > 0) {
 				this.inFunction -= 1;
-				out();
 			} else {
 				if (!this.afterByOrSetOrFromOrSelect) {
 					this.indent -= 1;
 					newline();
 				}
-				out();
 			}
+			out();
 			this.beginLine = false;
 		}
 
@@ -306,6 +314,9 @@ public class SqlFormatter {
 		}
 
 		private static boolean isFunctionName(String tok) {
+			if(StrUtil.isEmpty(tok)){
+				return true;
+			}
 			char begin = tok.charAt(0);
 			boolean isIdentifier = (Character.isJavaIdentifierStart(begin)) || ('"' == begin);
 			return (isIdentifier) && (!LOGICAL.contains(tok)) && (!END_CLAUSES.contains(tok)) && (!QUANTIFIERS.contains(tok)) && (!DML.contains(tok)) && (!MISC.contains(tok));

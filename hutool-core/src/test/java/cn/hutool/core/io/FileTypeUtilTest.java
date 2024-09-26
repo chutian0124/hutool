@@ -1,14 +1,11 @@
 package cn.hutool.core.io;
 
-import java.io.File;
-
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
-
-import cn.hutool.core.io.FileTypeUtil;
-import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.lang.Console;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+
+import java.io.*;
 
 /**
  * 文件类型判断单元测试
@@ -16,24 +13,87 @@ import cn.hutool.core.lang.Console;
  *
  */
 public class FileTypeUtilTest {
-	
+
 	@Test
-	@Ignore
+	@Disabled
 	public void fileTypeUtilTest() {
-		File file = FileUtil.file("hutool.jpg");
-		String type = FileTypeUtil.getType(file);
-		Assert.assertEquals("jpg", type);
-		
+		final File file = FileUtil.file("hutool.jpg");
+		final String type = FileTypeUtil.getType(file);
+		assertEquals("jpg", type);
+
 		FileTypeUtil.putFileType("ffd8ffe000104a464946", "new_jpg");
-		String newType = FileTypeUtil.getType(file);
-		Assert.assertEquals("new_jpg", newType);
+		final String newType = FileTypeUtil.getType(file);
+		assertEquals("new_jpg", newType);
 	}
-	
+
 	@Test
-	@Ignore
+	@Disabled
 	public void emptyTest() {
-		File file = FileUtil.file("d:/empty.txt");
-		String type = FileTypeUtil.getType(file);
+		final File file = FileUtil.file("d:/empty.txt");
+		final String type = FileTypeUtil.getType(file);
 		Console.log(type);
+	}
+
+	@Test
+	@Disabled
+	public void docTest() {
+		final File file = FileUtil.file("f:/test/test.doc");
+		final String type = FileTypeUtil.getType(file);
+		Console.log(type);
+	}
+
+	@Test
+	@Disabled
+	public void ofdTest() {
+		final File file = FileUtil.file("e:/test.ofd");
+		final String hex = IoUtil.readHex64Upper(FileUtil.getInputStream(file));
+		Console.log(hex);
+		final String type = FileTypeUtil.getType(file);
+		Console.log(type);
+		assertEquals("ofd", type);
+	}
+
+
+	@Test
+	@Disabled
+	public void inputStreamAndFilenameTest() {
+		final File file = FileUtil.file("e:/laboratory/test.xlsx");
+		final String type = FileTypeUtil.getType(file);
+		assertEquals("xlsx", type);
+	}
+
+	@Test
+	@Disabled
+	public void getTypeFromInputStream() throws IOException {
+		final File file = FileUtil.file("d:/test/pic.jpg");
+		final BufferedInputStream inputStream = FileUtil.getInputStream(file);
+		inputStream.mark(0);
+		final String type = FileTypeUtil.getType(inputStream);
+
+		inputStream.reset();
+	}
+
+	@Test
+	@Disabled
+	public void webpTest(){
+		// https://gitee.com/dromara/hutool/issues/I5BGTF
+		final File file = FileUtil.file("d:/test/a.webp");
+		final BufferedInputStream inputStream = FileUtil.getInputStream(file);
+		final String type = FileTypeUtil.getType(inputStream);
+		Console.log(type);
+	}
+
+	@Test
+	public void issueI6MACITest() {
+		final File file = FileUtil.file("text.txt");
+		final String type = FileTypeUtil.getType(file);
+		assertEquals("txt", type);
+	}
+
+	@Test
+	@Disabled
+	public void issue3024Test() {
+		String x = FileTypeUtil.getType(FileUtil.getInputStream("d:/test/TEST_WPS_DOC.doc"),true);
+		System.out.println(x);
 	}
 }

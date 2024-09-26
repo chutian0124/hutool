@@ -1,11 +1,15 @@
 package cn.hutool.http.webservice;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.Charset;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.map.MapUtil;
+import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.util.XmlUtil;
+import cn.hutool.http.HttpBase;
+import cn.hutool.http.HttpGlobalConfig;
+import cn.hutool.http.HttpRequest;
+import cn.hutool.http.HttpResponse;
 
 import javax.xml.XMLConstants;
 import javax.xml.namespace.QName;
@@ -15,20 +19,14 @@ import javax.xml.soap.Name;
 import javax.xml.soap.SOAPBodyElement;
 import javax.xml.soap.SOAPElement;
 import javax.xml.soap.SOAPException;
-import javax.xml.soap.SOAPHeader;
 import javax.xml.soap.SOAPHeaderElement;
 import javax.xml.soap.SOAPMessage;
-
-import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.io.IoUtil;
-import cn.hutool.core.map.MapUtil;
-import cn.hutool.core.util.CharsetUtil;
-import cn.hutool.core.util.ObjectUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.core.util.XmlUtil;
-import cn.hutool.http.HttpGlobalConfig;
-import cn.hutool.http.HttpRequest;
-import cn.hutool.http.HttpResponse;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.Charset;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 /**
  * SOAP客户端
@@ -52,21 +50,22 @@ import cn.hutool.http.HttpResponse;
  * @author looly
  * @since 4.5.4
  */
-public class SoapClient {
+public class SoapClient extends HttpBase<SoapClient> {
 
 	/**
 	 * XML消息体的Content-Type
+	 * soap1.1 : text/xml
+	 * soap1.2 : application/soap+xml
+	 * soap1.1与soap1.2区别:  https://www.cnblogs.com/qlqwjy/p/7577147.html
 	 */
-	private static final String TEXT_XML_CONTENT_TYPE = "text/xml;charset=";
+	private static final String CONTENT_TYPE_SOAP11_TEXT_XML = "text/xml;charset=";
+	private static final String CONTENT_TYPE_SOAP12_SOAP_XML = "application/soap+xml;charset=";
 
 	/**
 	 * 请求的URL地址
 	 */
 	private String url;
-	/**
-	 * 编码
-	 */
-	private Charset charset = CharsetUtil.CHARSET_UTF_8;
+
 	/**
 	 * 默认连接超时
 	 */
@@ -91,13 +90,19 @@ public class SoapClient {
 	/**
 	 * 应用于方法上的命名空间URI
 	 */
-	private String namespaceURI;
+	private final String namespaceURI;
+	/**
+	 * Soap协议
+	 * soap1.1 : text/xml
+	 * soap1.2 : application/soap+xml
+	 */
+	private final SoapProtocol protocol;
 
 	/**
 	 * 创建SOAP客户端，默认使用soap1.1版本协议
 	 *
 	 * @param url WS的URL地址
-	 * @return {@link SoapClient}
+	 * @return this
 	 */
 	public static SoapClient create(String url) {
 		return new SoapClient(url);
@@ -108,7 +113,7 @@ public class SoapClient {
 	 *
 	 * @param url      WS的URL地址
 	 * @param protocol 协议，见{@link SoapProtocol}
-	 * @return {@link SoapClient}
+	 * @return this
 	 */
 	public static SoapClient create(String url, SoapProtocol protocol) {
 		return new SoapClient(url, protocol);
@@ -120,7 +125,7 @@ public class SoapClient {
 	 * @param url          WS的URL地址
 	 * @param protocol     协议，见{@link SoapProtocol}
 	 * @param namespaceURI 方法上的命名空间URI
-	 * @return {@link SoapClient}
+	 * @return this
 	 * @since 4.5.6
 	 */
 	public static SoapClient create(String url, SoapProtocol protocol, String namespaceURI) {
@@ -157,6 +162,7 @@ public class SoapClient {
 	public SoapClient(String url, SoapProtocol protocol, String namespaceURI) {
 		this.url = url;
 		this.namespaceURI = namespaceURI;
+		this.protocol = protocol;
 		init(protocol);
 	}
 
@@ -204,11 +210,17 @@ public class SoapClient {
 	 *
 	 * @param charset 编码
 	 * @return this
+	 * @see #charset(Charset)
 	 */
 	public SoapClient setCharset(Charset charset) {
-		this.charset = charset;
+		return this.charset(charset);
+	}
+
+	@Override
+	public SoapClient charset(Charset charset) {
+		super.charset(charset);
 		try {
-			this.message.setProperty(SOAPMessage.CHARACTER_SET_ENCODING, this.charset.toString());
+			this.message.setProperty(SOAPMessage.CHARACTER_SET_ENCODING, this.charset());
 			this.message.setProperty(SOAPMessage.WRITE_XML_DECLARATION, "true");
 		} catch (SOAPException e) {
 			// ignore
@@ -229,31 +241,19 @@ public class SoapClient {
 	}
 
 	/**
-	 * 设置头信息
-	 *
-	 * @param name 头信息标签名
-	 * @return this
-	 */
-	public SoapClient setHeader(QName name) {
-		return setHeader(name, null, null, null, null);
-	}
-
-	/**
-	 * 设置头信息
+	 * 增加SOAP头信息，方法返回{@link SOAPHeaderElement}可以设置具体属性和子节点
 	 *
 	 * @param name           头信息标签名
 	 * @param actorURI       中间的消息接收者
 	 * @param roleUri        Role的URI
 	 * @param mustUnderstand 标题项对于要对其进行处理的接收者来说是强制的还是可选的
 	 * @param relay          relay属性
-	 * @return this
+	 * @return {@link SOAPHeaderElement}
+	 * @since 5.4.4
 	 */
-	public SoapClient setHeader(QName name, String actorURI, String roleUri, Boolean mustUnderstand, Boolean relay) {
-		SOAPHeader header;
-		SOAPHeaderElement ele;
+	public SOAPHeaderElement addSOAPHeader(QName name, String actorURI, String roleUri, Boolean mustUnderstand, Boolean relay) {
+		final SOAPHeaderElement ele = addSOAPHeader(name);
 		try {
-			header = this.message.getSOAPHeader();
-			ele = header.addHeaderElement(name);
 			if (StrUtil.isNotBlank(roleUri)) {
 				ele.setRole(roleUri);
 			}
@@ -271,7 +271,49 @@ public class SoapClient {
 			ele.setMustUnderstand(mustUnderstand);
 		}
 
-		return this;
+		return ele;
+	}
+
+	/**
+	 * 增加SOAP头信息，方法返回{@link SOAPHeaderElement}可以设置具体属性和子节点
+	 *
+	 * @param localName 头节点名称
+	 * @return {@link SOAPHeaderElement}
+	 * @since 5.4.7
+	 */
+	public SOAPHeaderElement addSOAPHeader(String localName) {
+		return addSOAPHeader(new QName(localName));
+	}
+
+	/**
+	 * 增加SOAP头信息，方法返回{@link SOAPHeaderElement}可以设置具体属性和子节点
+	 *
+	 * @param localName 头节点名称
+	 * @param value     头节点的值
+	 * @return {@link SOAPHeaderElement}
+	 * @since 5.4.7
+	 */
+	public SOAPHeaderElement addSOAPHeader(String localName, String value) {
+		final SOAPHeaderElement soapHeaderElement = addSOAPHeader(localName);
+		soapHeaderElement.setTextContent(value);
+		return soapHeaderElement;
+	}
+
+	/**
+	 * 增加SOAP头信息，方法返回{@link SOAPHeaderElement}可以设置具体属性和子节点
+	 *
+	 * @param name 头节点名称
+	 * @return {@link SOAPHeaderElement}
+	 * @since 5.4.4
+	 */
+	public SOAPHeaderElement addSOAPHeader(QName name) {
+		SOAPHeaderElement ele;
+		try {
+			ele = this.message.getSOAPHeader().addHeaderElement(name);
+		} catch (SOAPException e) {
+			throw new SoapRuntimeException(e);
+		}
+		return ele;
 	}
 
 	/**
@@ -296,7 +338,7 @@ public class SoapClient {
 	 */
 	public SoapClient setMethod(QName name, Map<String, Object> params, boolean useMethodPrefix) {
 		setMethod(name);
-		final String prefix = name.getPrefix();
+		final String prefix = useMethodPrefix ? name.getPrefix() : null;
 		final SOAPBodyElement methodEle = this.methodEle;
 		for (Entry<String, Object> entry : MapUtil.wrap(params)) {
 			setParam(methodEle, entry.getKey(), entry.getValue(), prefix);
@@ -543,12 +585,13 @@ public class SoapClient {
 	 *
 	 * @return 响应对象
 	 */
-	private HttpResponse sendForResponse() {
+	public HttpResponse sendForResponse() {
 		return HttpRequest.post(this.url)//
 				.setFollowRedirects(true)//
 				.setConnectionTimeout(this.connectionTimeout)
 				.setReadTimeout(this.readTimeout)
 				.contentType(getXmlContentType())//
+				.header(this.headers())
 				.body(getMsgStr(false))//
 				.executeAsync();
 	}
@@ -559,7 +602,14 @@ public class SoapClient {
 	 * @return 请求的Content-Type
 	 */
 	private String getXmlContentType() {
-		return TEXT_XML_CONTENT_TYPE.concat(this.charset.toString());
+		switch (this.protocol){
+			case SOAP_1_1:
+				return CONTENT_TYPE_SOAP11_TEXT_XML.concat(this.charset.toString());
+			case SOAP_1_2:
+				return CONTENT_TYPE_SOAP12_SOAP_XML.concat(this.charset.toString());
+			default:
+				throw new SoapRuntimeException("Unsupported protocol: {}", this.protocol);
+		}
 	}
 
 	/**
@@ -568,7 +618,7 @@ public class SoapClient {
 	 * @param ele    方法节点
 	 * @param name   参数名
 	 * @param value  参数值
-	 * @param prefix 命名空间前缀
+	 * @param prefix 命名空间前缀， {@code null}表示不使用前缀
 	 * @return {@link SOAPElement}子节点
 	 */
 	@SuppressWarnings("rawtypes")

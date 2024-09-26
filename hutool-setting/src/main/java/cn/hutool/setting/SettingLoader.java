@@ -2,15 +2,17 @@ package cn.hutool.setting;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.IoUtil;
-import cn.hutool.core.io.resource.UrlResource;
+import cn.hutool.core.io.resource.Resource;
+import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.CharUtil;
 import cn.hutool.core.util.CharsetUtil;
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.util.SystemPropsUtil;
 import cn.hutool.log.Log;
-import cn.hutool.log.LogFactory;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
@@ -23,12 +25,12 @@ import java.util.Set;
 
 /**
  * Setting文件加载器
- * 
+ *
  * @author Looly
  *
  */
 public class SettingLoader {
-	private static Log log = LogFactory.get();
+	private static final Log log = Log.get();
 
 	/** 注释符号（当有此符号在行首，表示此行为注释） */
 	private final static char COMMENT_FLAG_PRE = '#';
@@ -38,15 +40,15 @@ public class SettingLoader {
 	private String varRegex = "\\$\\{(.*?)\\}";
 
 	/** 本设置对象的字符集 */
-	private Charset charset;
+	private final Charset charset;
 	/** 是否使用变量 */
-	private boolean isUseVariable;
+	private final boolean isUseVariable;
 	/** GroupedMap */
-	private GroupedMap groupedMap;
+	private final GroupedMap groupedMap;
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param groupedMap GroupedMap
 	 */
 	public SettingLoader(GroupedMap groupedMap) {
@@ -55,7 +57,7 @@ public class SettingLoader {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param groupedMap GroupedMap
 	 * @param charset 编码
 	 * @param isUseVariable 是否使用变量
@@ -68,18 +70,18 @@ public class SettingLoader {
 
 	/**
 	 * 加载设置文件
-	 * 
-	 * @param urlResource 配置文件URL
+	 *
+	 * @param resource 配置文件URL
 	 * @return 加载是否成功
 	 */
-	public boolean load(UrlResource urlResource) {
-		if (urlResource == null) {
+	public boolean load(Resource resource) {
+		if (resource == null) {
 			throw new NullPointerException("Null setting url define!");
 		}
-		log.debug("Load setting file [{}]", urlResource);
+		log.debug("Load setting file [{}]", resource);
 		InputStream settingStream = null;
 		try {
-			settingStream = urlResource.getStream();
+			settingStream = resource.getStream();
 			load(settingStream);
 		} catch (Exception e) {
 			log.error(e, "Load setting error!");
@@ -92,7 +94,7 @@ public class SettingLoader {
 
 	/**
 	 * 加载设置文件。 此方法不会关闭流对象
-	 * 
+	 *
 	 * @param settingStream 文件流
 	 * @return 加载成功与否
 	 * @throws IOException IO异常
@@ -111,7 +113,7 @@ public class SettingLoader {
 				if (line == null) {
 					break;
 				}
-				line = line.trim();
+				line = StrUtil.trim(line);
 				// 跳过注释行和空行
 				if (StrUtil.isBlank(line) || StrUtil.startWith(line, COMMENT_FLAG_PRE)) {
 					continue;
@@ -119,7 +121,7 @@ public class SettingLoader {
 
 				// 记录分组名
 				if (StrUtil.isSurround(line, CharUtil.BRACKET_START, CharUtil.BRACKET_END)) {
-					group = line.substring(1, line.length() - 1).trim();
+					group = StrUtil.trim(line.substring(1, line.length() - 1));
 					continue;
 				}
 
@@ -129,12 +131,12 @@ public class SettingLoader {
 					continue;
 				}
 
-				String value = keyValue[1].trim();
+				String value = StrUtil.trim(keyValue[1]);
 				// 替换值中的所有变量变量（变量必须是此行之前定义的变量，否则无法找到）
 				if (this.isUseVariable) {
 					value = replaceVar(group, value);
 				}
-				this.groupedMap.put(group, keyValue[0].trim(), value);
+				this.groupedMap.put(group, StrUtil.trim(keyValue[0]), value);
 			}
 		} finally {
 			IoUtil.close(reader);
@@ -145,7 +147,7 @@ public class SettingLoader {
 	/**
 	 * 设置变量的正则<br>
 	 * 正则只能有一个group表示变量本身，剩余为字符 例如 \$\{(name)\}表示${name}变量名为name的一个变量表示
-	 * 
+	 *
 	 * @param regex 正则
 	 */
 	public void setVarRegex(String regex) {
@@ -154,7 +156,7 @@ public class SettingLoader {
 
 	/**
 	 * 赋值分隔符（用于分隔键值对）
-	 * 
+	 *
 	 * @param assignFlag 正则
 	 * @since 4.6.5
 	 */
@@ -165,13 +167,26 @@ public class SettingLoader {
 	/**
 	 * 持久化当前设置，会覆盖掉之前的设置<br>
 	 * 持久化会不会保留之前的分组
-	 * 
+	 *
 	 * @param absolutePath 设置文件的绝对路径
 	 */
 	public void store(String absolutePath) {
+		store(FileUtil.touch(absolutePath));
+	}
+
+	/**
+	 * 持久化当前设置，会覆盖掉之前的设置<br>
+	 * 持久化会不会保留之前的分组
+	 *
+	 * @param file 设置文件
+	 * @since 5.4.3
+	 */
+	public void store(File file) {
+		Assert.notNull(file, "File to store must be not null !");
+		log.debug("Store Setting to [{}]...", file.getAbsolutePath());
 		PrintWriter writer = null;
 		try {
-			writer = FileUtil.getPrintWriter(absolutePath, charset, false);
+			writer = FileUtil.getPrintWriter(file, charset, false);
 			store(writer);
 		} finally {
 			IoUtil.close(writer);
@@ -180,7 +195,7 @@ public class SettingLoader {
 
 	/**
 	 * 存储到Writer
-	 * 
+	 *
 	 * @param writer Writer
 	 */
 	synchronized private void store(PrintWriter writer) {
@@ -195,7 +210,7 @@ public class SettingLoader {
 	// ----------------------------------------------------------------------------------- Private method start
 	/**
 	 * 替换给定值中的变量标识
-	 * 
+	 *
 	 * @param group 所在分组
 	 * @param value 值
 	 * @return 替换后的字符串
@@ -216,13 +231,9 @@ public class SettingLoader {
 						varValue = this.groupedMap.get(groupAndKey.get(0), groupAndKey.get(1));
 					}
 				}
-				// 系统参数中查找
+				// 系统参数和环境变量中查找
 				if (null == varValue) {
-					varValue = System.getProperty(key);
-				}
-				// 环境变量中查找
-				if (null == varValue) {
-					varValue = System.getenv(key);
+					varValue = SystemPropsUtil.get(key);
 				}
 
 				if (null != varValue) {

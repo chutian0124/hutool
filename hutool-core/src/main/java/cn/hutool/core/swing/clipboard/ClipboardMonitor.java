@@ -1,5 +1,8 @@
 package cn.hutool.core.swing.clipboard;
 
+import cn.hutool.core.thread.ThreadUtil;
+import cn.hutool.core.util.ObjectUtil;
+
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.ClipboardOwner;
 import java.awt.datatransfer.Transferable;
@@ -7,18 +10,15 @@ import java.io.Closeable;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import cn.hutool.core.thread.ThreadUtil;
-import cn.hutool.core.util.ObjectUtil;
-
 /**
  * 剪贴板监听
- * 
+ *
  * @author looly
  * @since 4.5.6
  */
 public enum ClipboardMonitor implements ClipboardOwner, Runnable, Closeable {
 	INSTANCE;
-	
+
 	/** 默认重试此时：10 */
 	public static final int DEFAULT_TRY_COUNT = 10;
 	/** 默认重试等待：100 */
@@ -45,7 +45,7 @@ public enum ClipboardMonitor implements ClipboardOwner, Runnable, Closeable {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param tryCount 尝试获取剪贴板内容的次数
 	 * @param delay 响应延迟，当从第二次开始，延迟一定毫秒数等待剪贴板可以获取，当tryCount小于2时无效
 	 */
@@ -55,7 +55,7 @@ public enum ClipboardMonitor implements ClipboardOwner, Runnable, Closeable {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param tryCount 尝试获取剪贴板内容的次数
 	 * @param delay 响应延迟，当从第二次开始，延迟一定毫秒数等待剪贴板可以获取，当tryCount小于2时无效
 	 * @param clipboard 剪贴板对象
@@ -69,7 +69,7 @@ public enum ClipboardMonitor implements ClipboardOwner, Runnable, Closeable {
 
 	/**
 	 * 设置重试次数
-	 * 
+	 *
 	 * @param tryCount 重试次数
 	 * @return this
 	 */
@@ -80,7 +80,7 @@ public enum ClipboardMonitor implements ClipboardOwner, Runnable, Closeable {
 
 	/**
 	 * 设置重试等待
-	 * 
+	 *
 	 * @param delay 重试等待
 	 * @return this
 	 */
@@ -91,7 +91,7 @@ public enum ClipboardMonitor implements ClipboardOwner, Runnable, Closeable {
 
 	/**
 	 * 设置 监听事件处理
-	 * 
+	 *
 	 * @param listener 监听事件处理
 	 * @return this
 	 */
@@ -102,7 +102,7 @@ public enum ClipboardMonitor implements ClipboardOwner, Runnable, Closeable {
 
 	/**
 	 * 去除指定监听
-	 * 
+	 *
 	 * @param listener 监听
 	 * @return this
 	 */
@@ -113,7 +113,7 @@ public enum ClipboardMonitor implements ClipboardOwner, Runnable, Closeable {
 
 	/**
 	 * 清空监听
-	 * 
+	 *
 	 * @return this
 	 */
 	public ClipboardMonitor clearListener() {
@@ -157,7 +157,7 @@ public enum ClipboardMonitor implements ClipboardOwner, Runnable, Closeable {
 
 	/**
 	 * 开始监听
-	 * 
+	 *
 	 * @param sync 是否阻塞
 	 */
 	public void listen(boolean sync) {
@@ -179,7 +179,7 @@ public enum ClipboardMonitor implements ClipboardOwner, Runnable, Closeable {
 	// ------------------------------------------------------------------------------------------------------------------------- Private method start
 	/**
 	 * 尝试获取剪贴板内容
-	 * 
+	 *
 	 * @param clipboard 剪贴板
 	 * @return 剪贴板内容，{@code null} 表示未获取到
 	 * @throws InterruptedException 线程中断
@@ -189,6 +189,7 @@ public enum ClipboardMonitor implements ClipboardOwner, Runnable, Closeable {
 		for (int i = 0; i < this.tryCount; i++) {
 			if (this.delay > 0 && i > 0) {
 				// 第一次获取不等待，只有从第二次获取时才开始等待
+				//noinspection BusyWait
 				Thread.sleep(this.delay);
 			}
 
@@ -201,7 +202,7 @@ public enum ClipboardMonitor implements ClipboardOwner, Runnable, Closeable {
 				return newContents;
 			}
 		}
-		return newContents;
+		return null;
 	}
 	// ------------------------------------------------------------------------------------------------------------------------- Private method end
 }

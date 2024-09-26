@@ -1,24 +1,24 @@
 package cn.hutool.setting;
 
+import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.collection.ListUtil;
+import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.util.ArrayUtil;
+import cn.hutool.core.util.CharsetUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.util.URLUtil;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.Charset;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-
-import cn.hutool.core.collection.CollectionUtil;
-import cn.hutool.core.io.IoUtil;
-import cn.hutool.core.util.ArrayUtil;
-import cn.hutool.core.util.CharsetUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.core.util.URLUtil;
 
 /**
  * 分组化的Set集合类<br>
@@ -94,9 +94,6 @@ public class GroupedSet extends HashMap<String, LinkedHashSet<String>> {
 			throw new RuntimeException("Null GroupSet file!");
 		}
 		final URL url = URLUtil.getURL(configFile);
-		if (url == null) {
-			throw new RuntimeException(StrUtil.format("Can not find GroupSet file: [{}]", configFile.getAbsolutePath()));
-		}
 		this.init(url, charset);
 	}
 
@@ -281,8 +278,8 @@ public class GroupedSet extends HashMap<String, LinkedHashSet<String>> {
 	 */
 	public boolean contains(String group, String value, String... otherValues) {
 		if (ArrayUtil.isNotEmpty(otherValues)) {
-			// 需要测试多个值的情况
-			final List<String> valueList = Arrays.asList(otherValues);
+			// 需要测试多个值的情况		
+			final List<String> valueList = ListUtil.toList(otherValues);
 			valueList.add(value);
 			return contains(group, valueList);
 		} else {

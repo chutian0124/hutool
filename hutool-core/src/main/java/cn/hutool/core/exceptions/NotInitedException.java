@@ -4,7 +4,7 @@ import cn.hutool.core.util.StrUtil;
 
 /**
  * 未初始化异常
- * 
+ *
  * @author xiaoleilu
  */
 public class NotInitedException extends RuntimeException {
@@ -24,6 +24,10 @@ public class NotInitedException extends RuntimeException {
 
 	public NotInitedException(String message, Throwable throwable) {
 		super(message, throwable);
+	}
+
+	public NotInitedException(String message, Throwable throwable, boolean enableSuppression, boolean writableStackTrace) {
+		super(message, throwable, enableSuppression, writableStackTrace);
 	}
 
 	public NotInitedException(Throwable throwable, String messageTemplate, Object... params) {

@@ -1,17 +1,20 @@
 package cn.hutool.db.sql;
 
-import java.util.Collection;
-
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.db.DbRuntimeException;
+import cn.hutool.db.Entity;
 import cn.hutool.db.Page;
+
+import java.util.Collection;
+import java.util.Set;
 
 /**
  * 查询对象，用于传递查询所需的字段值<br>
  * 查询对象根据表名（可以多个），多个条件 {@link Condition} 构建查询对象完成查询。<br>
  * 如果想自定义返回结果，则可在查询对象中自定义要查询的字段名，分页{@link Page}信息来自定义结果。
- * 
+ *
  * @author Looly
  *
  */
@@ -26,10 +29,26 @@ public class Query {
 	/** 分页对象 */
 	Page page;
 
+	/**
+	 * 从{@link Entity}构建Query
+	 * @param where 条件查询{@link Entity}，包含条件Map和表名
+	 * @return Query
+	 * @since 5.5.3
+	 */
+	public static Query of(Entity where){
+		final Query query = new Query(SqlUtil.buildConditions(where), where.getTableName());
+		final Set<String> fieldNames = where.getFieldNames();
+		if(CollUtil.isNotEmpty(fieldNames)){
+			query.setFields(fieldNames);
+		}
+
+		return query;
+	}
+
 	// --------------------------------------------------------------- Constructor start
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param tableNames 表名
 	 */
 	public Query(String... tableNames) {
@@ -39,7 +58,7 @@ public class Query {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param where 条件语句
 	 * @param tableNames 表名
 	 */
@@ -49,7 +68,7 @@ public class Query {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param where 条件语句
 	 * @param page 分页
 	 * @param tableNames 表名
@@ -60,7 +79,7 @@ public class Query {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param fields 字段
 	 * @param tableNames 表名
 	 * @param where 条件
@@ -77,7 +96,7 @@ public class Query {
 	// --------------------------------------------------------------- Getters and Setters start
 	/**
 	 * 获得查询的字段名列表
-	 * 
+	 *
 	 * @return 查询的字段名列表
 	 */
 	public Collection<String> getFields() {
@@ -86,7 +105,7 @@ public class Query {
 
 	/**
 	 * 设置查询的字段名列表
-	 * 
+	 *
 	 * @param fields 查询的字段名列表
 	 * @return this
 	 */
@@ -97,7 +116,7 @@ public class Query {
 
 	/**
 	 * 设置查询的字段名列表
-	 * 
+	 *
 	 * @param fields 查询的字段名列表
 	 * @return this
 	 */
@@ -108,7 +127,7 @@ public class Query {
 
 	/**
 	 * 获得表名数组
-	 * 
+	 *
 	 * @return 表名数组
 	 */
 	public String[] getTableNames() {
@@ -117,7 +136,7 @@ public class Query {
 
 	/**
 	 * 设置表名
-	 * 
+	 *
 	 * @param tableNames 表名
 	 * @return this
 	 */
@@ -128,7 +147,7 @@ public class Query {
 
 	/**
 	 * 获得条件语句
-	 * 
+	 *
 	 * @return 条件语句
 	 */
 	public Condition[] getWhere() {
@@ -137,7 +156,7 @@ public class Query {
 
 	/**
 	 * 设置条件语句
-	 * 
+	 *
 	 * @param where 条件语句
 	 * @return this
 	 */
@@ -147,9 +166,9 @@ public class Query {
 	}
 
 	/**
-	 * 获得分页对象
-	 * 
-	 * @return 分页对象
+	 * 获得分页对象，无分页返回{@code null}
+	 *
+	 * @return 分页对象 or {@code null}
 	 */
 	public Page getPage() {
 		return page;
@@ -157,7 +176,7 @@ public class Query {
 
 	/**
 	 * 设置分页对象
-	 * 
+	 *
 	 * @param page 分页对象
 	 * @return this
 	 */
@@ -169,7 +188,7 @@ public class Query {
 
 	/**
 	 * 获得第一个表名
-	 * 
+	 *
 	 * @return 表名
 	 * @throws DbRuntimeException 没有表
 	 */

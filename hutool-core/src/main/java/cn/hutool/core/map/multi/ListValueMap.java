@@ -8,14 +8,14 @@ import java.util.Map;
 
 /**
  * 值作为集合List的Map实现，通过调用putValue可以在相同key时加入多个值，多个值用集合表示
- * 
+ *
  * @author looly
  *
  * @param <K> 键类型
  * @param <V> 值类型
  * @since 4.3.3
  */
-public class ListValueMap<K, V> extends CollectionValueMap<K, V> {
+public class ListValueMap<K, V> extends AbsCollValueMap<K, V, List<V>> {
 	private static final long serialVersionUID = 6044017508487827899L;
 
 	// ------------------------------------------------------------------------- Constructor start
@@ -28,7 +28,7 @@ public class ListValueMap<K, V> extends CollectionValueMap<K, V> {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param initialCapacity 初始大小
 	 */
 	public ListValueMap(int initialCapacity) {
@@ -37,7 +37,7 @@ public class ListValueMap<K, V> extends CollectionValueMap<K, V> {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param m Map
 	 */
 	public ListValueMap(Map<? extends K, ? extends Collection<V>> m) {
@@ -46,33 +46,28 @@ public class ListValueMap<K, V> extends CollectionValueMap<K, V> {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param loadFactor 加载因子
 	 * @param m Map
 	 */
 	public ListValueMap(float loadFactor, Map<? extends K, ? extends Collection<V>> m) {
 		this(m.size(), loadFactor);
-		this.putAll(m);
+		this.putAllValues(m);
 	}
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param initialCapacity 初始大小
 	 * @param loadFactor 加载因子
 	 */
 	public ListValueMap(int initialCapacity, float loadFactor) {
-		super(new HashMap<K, Collection<V>>(initialCapacity, loadFactor));
+		super(new HashMap<>(initialCapacity, loadFactor));
 	}
 	// ------------------------------------------------------------------------- Constructor end
 
 	@Override
-	public List<V> get(Object key) {
-		return (List<V>) super.get(key);
-	}
-	
-	@Override
-	protected Collection<V> createCollction() {
-		return new ArrayList<>(DEFAULT_COLLCTION_INITIAL_CAPACITY);
+	protected List<V> createCollection() {
+		return new ArrayList<>(DEFAULT_COLLECTION_INITIAL_CAPACITY);
 	}
 }

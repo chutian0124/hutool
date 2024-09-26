@@ -8,7 +8,8 @@ import java.io.Serializable;
 import java.util.Arrays;
 
 /**
- * 可复用的字符串生成器，非线程安全
+ * 可复用的字符串生成器，非线程安全<br>
+ *  TODO 6.x移除此类，java8的StringBuilder非常完善了，无需重写。
  *
  * @author Looly
  * @since 4.0.0
@@ -33,7 +34,7 @@ public class StrBuilder implements CharSequence, Appendable, Serializable {
 	/**
 	 * 创建字符串构建器
 	 *
-	 * @return {@link StrBuilder}
+	 * @return this
 	 */
 	public static StrBuilder create() {
 		return new StrBuilder();
@@ -43,7 +44,7 @@ public class StrBuilder implements CharSequence, Appendable, Serializable {
 	 * 创建字符串构建器
 	 *
 	 * @param initialCapacity 初始容量
-	 * @return {@link StrBuilder}
+	 * @return this
 	 */
 	public static StrBuilder create(int initialCapacity) {
 		return new StrBuilder(initialCapacity);
@@ -53,7 +54,7 @@ public class StrBuilder implements CharSequence, Appendable, Serializable {
 	 * 创建字符串构建器
 	 *
 	 * @param strs 初始字符串
-	 * @return {@link StrBuilder}
+	 * @return this
 	 * @since 4.0.1
 	 */
 	public static StrBuilder create(CharSequence... strs) {
@@ -86,8 +87,8 @@ public class StrBuilder implements CharSequence, Appendable, Serializable {
 	 */
 	public StrBuilder(CharSequence... strs) {
 		this(ArrayUtil.isEmpty(strs) ? DEFAULT_CAPACITY : (totalLength(strs) + DEFAULT_CAPACITY));
-		for (int i = 0; i < strs.length; i++) {
-			append(strs[i]);
+		for (CharSequence str : strs) {
+			append(str);
 		}
 	}
 	// ------------------------------------------------------------------------------------ Constructor end
@@ -174,6 +175,13 @@ public class StrBuilder implements CharSequence, Appendable, Serializable {
 	 * @return this
 	 */
 	public StrBuilder insert(int index, char c) {
+		if(index < 0){
+			index = this.position + index;
+		}
+		if ((index < 0)) {
+			throw new StringIndexOutOfBoundsException(index);
+		}
+
 		moveDataAfterIndex(index, 1);
 		value[index] = c;
 		this.position = Math.max(this.position, index) + 1;
@@ -211,9 +219,13 @@ public class StrBuilder implements CharSequence, Appendable, Serializable {
 		if (ArrayUtil.isEmpty(src) || srcPos > src.length || length <= 0) {
 			return this;
 		}
-		if (index < 0) {
-			index = 0;
+		if(index < 0){
+			index = this.position + index;
 		}
+		if ((index < 0)) {
+			throw new StringIndexOutOfBoundsException(index);
+		}
+
 		if (srcPos < 0) {
 			srcPos = 0;
 		} else if (srcPos + length > src.length) {
@@ -238,8 +250,15 @@ public class StrBuilder implements CharSequence, Appendable, Serializable {
 	 * @return this
 	 */
 	public StrBuilder insert(int index, CharSequence csq) {
+		if(index < 0){
+			index = this.position + index;
+		}
+		if ((index < 0)) {
+			throw new StringIndexOutOfBoundsException(index);
+		}
+
 		if (null == csq) {
-			csq = "null";
+			csq = StrUtil.EMPTY;
 		}
 		int len = csq.length();
 		moveDataAfterIndex(index, csq.length());
@@ -288,8 +307,11 @@ public class StrBuilder implements CharSequence, Appendable, Serializable {
 		if (start >= end) {
 			return this;
 		}
-		if (index < 0) {
-			index = 0;
+		if(index < 0){
+			index = this.position + index;
+		}
+		if ((index < 0)) {
+			throw new StringIndexOutOfBoundsException(index);
 		}
 
 		final int length = end - start;
@@ -461,6 +483,9 @@ public class StrBuilder implements CharSequence, Appendable, Serializable {
 
 	@Override
 	public char charAt(int index) {
+		if(index < 0){
+			index = this.position + index;
+		}
 		if ((index < 0) || (index > this.position)) {
 			throw new StringIndexOutOfBoundsException(index);
 		}
@@ -519,7 +544,8 @@ public class StrBuilder implements CharSequence, Appendable, Serializable {
 	 * @param minimumCapacity 最小容量
 	 */
 	private void ensureCapacity(int minimumCapacity) {
-		if (minimumCapacity > value.length) {
+		// overflow-conscious code
+		if (minimumCapacity - value.length > 0) {
 			expandCapacity(minimumCapacity);
 		}
 	}
@@ -531,16 +557,13 @@ public class StrBuilder implements CharSequence, Appendable, Serializable {
 	 * @param minimumCapacity 需要扩展的最小容量
 	 */
 	private void expandCapacity(int minimumCapacity) {
-		int newCapacity = value.length * 2 + 2;
-		if (newCapacity < minimumCapacity) {
+		int newCapacity = (value.length << 1) + 2;
+		// overflow-conscious code
+		if (newCapacity - minimumCapacity < 0) {
 			newCapacity = minimumCapacity;
 		}
 		if (newCapacity < 0) {
-			if (minimumCapacity < 0) {
-				// overflow
-				throw new OutOfMemoryError("Capacity is too long and max than Integer.MAX");
-			}
-			newCapacity = Integer.MAX_VALUE;
+			throw new OutOfMemoryError("Capacity is too long and max than Integer.MAX");
 		}
 		value = Arrays.copyOf(value, newCapacity);
 	}
@@ -555,8 +578,8 @@ public class StrBuilder implements CharSequence, Appendable, Serializable {
 	 */
 	private static int totalLength(CharSequence... strs) {
 		int totalLength = 0;
-		for (int i = 0; i < strs.length; i++) {
-			totalLength += (null == strs[i] ? 4 : strs[i].length());
+		for (CharSequence str : strs) {
+			totalLength += (null == str ? 0 : str.length());
 		}
 		return totalLength;
 	}

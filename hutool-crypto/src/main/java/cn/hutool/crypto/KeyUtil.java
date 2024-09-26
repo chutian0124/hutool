@@ -1,28 +1,15 @@
 package cn.hutool.crypto;
 
-import java.io.File;
-import java.io.InputStream;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.KeyFactory;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.Provider;
-import java.security.PublicKey;
-import java.security.SecureRandom;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.security.spec.AlgorithmParameterSpec;
-import java.security.spec.ECGenParameterSpec;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.KeySpec;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
+import cn.hutool.core.codec.Base64;
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.lang.Assert;
+import cn.hutool.core.util.ArrayUtil;
+import cn.hutool.core.util.CharUtil;
+import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.asymmetric.AsymmetricAlgorithm;
+import cn.hutool.crypto.symmetric.SymmetricAlgorithm;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -31,17 +18,15 @@ import javax.crypto.spec.DESKeySpec;
 import javax.crypto.spec.DESedeKeySpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
-
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.io.IoUtil;
-import cn.hutool.core.lang.Assert;
-import cn.hutool.core.util.ArrayUtil;
-import cn.hutool.core.util.CharUtil;
-import cn.hutool.core.util.CharsetUtil;
-import cn.hutool.core.util.RandomUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.crypto.asymmetric.AsymmetricAlgorithm;
-import cn.hutool.crypto.symmetric.SymmetricAlgorithm;
+import java.io.File;
+import java.io.InputStream;
+import java.math.BigInteger;
+import java.security.*;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.interfaces.RSAPrivateCrtKey;
+import java.security.spec.*;
 
 /**
  * 密钥工具类
@@ -93,7 +78,7 @@ public class KeyUtil {
 	 * Default SM2 curve
 	 * </pre>
 	 */
-	public static final String SM2_DEFAULT_CURVE = "sm2p256v1";
+	public static final String SM2_DEFAULT_CURVE = SmUtil.SM2_CURVE_NAME;
 
 	/**
 	 * 生成 {@link SecretKey}，仅用于对称加密和摘要算法密钥生成
@@ -106,22 +91,43 @@ public class KeyUtil {
 	}
 
 	/**
-	 * 生成 {@link SecretKey}，仅用于对称加密和摘要算法密钥生成
+	 * 生成 {@link SecretKey}，仅用于对称加密和摘要算法密钥生成<br>
+	 * 当指定keySize&lt;0时，AES默认长度为128，其它算法不指定。
 	 *
 	 * @param algorithm 算法，支持PBE算法
-	 * @param keySize   密钥长度
+	 * @param keySize   密钥长度，&lt;0表示不设定密钥长度，即使用默认长度
 	 * @return {@link SecretKey}
 	 * @since 3.1.2
 	 */
 	public static SecretKey generateKey(String algorithm, int keySize) {
+		return generateKey(algorithm, keySize, null);
+	}
+
+	/**
+	 * 生成 {@link SecretKey}，仅用于对称加密和摘要算法密钥生成<br>
+	 * 当指定keySize&lt;0时，AES默认长度为128，其它算法不指定。
+	 *
+	 * @param algorithm 算法，支持PBE算法
+	 * @param keySize   密钥长度，&lt;0表示不设定密钥长度，即使用默认长度
+	 * @param random    随机数生成器，null表示默认
+	 * @return {@link SecretKey}
+	 * @since 5.5.2
+	 */
+	public static SecretKey generateKey(String algorithm, int keySize, SecureRandom random) {
 		algorithm = getMainAlgorithm(algorithm);
 
 		final KeyGenerator keyGenerator = getKeyGenerator(algorithm);
-		if (keySize > 0) {
-			keyGenerator.init(keySize);
-		} else if (SymmetricAlgorithm.AES.getValue().equals(algorithm)) {
+		if (keySize <= 0 && SymmetricAlgorithm.AES.getValue().equals(algorithm)) {
 			// 对于AES的密钥，除非指定，否则强制使用128位
-			keyGenerator.init(128);
+			keySize = 128;
+		}
+
+		if (keySize > 0) {
+			if (null == random) {
+				keyGenerator.init(keySize);
+			} else {
+				keyGenerator.init(keySize, random);
+			}
 		}
 		return keyGenerator.generateKey();
 	}
@@ -138,7 +144,7 @@ public class KeyUtil {
 		SecretKey secretKey;
 		if (algorithm.startsWith("PBE")) {
 			// PBE密钥
-			secretKey = generatePBEKey(algorithm, (null == key) ? null : StrUtil.str(key, CharsetUtil.CHARSET_UTF_8).toCharArray());
+			secretKey = generatePBEKey(algorithm, (null == key) ? null : StrUtil.utf8Str(key).toCharArray());
 		} else if (algorithm.startsWith("DES")) {
 			// DES密钥
 			secretKey = generateDESKey(algorithm, key);
@@ -158,7 +164,7 @@ public class KeyUtil {
 	 */
 	public static SecretKey generateDESKey(String algorithm, byte[] key) {
 		if (StrUtil.isBlank(algorithm) || false == algorithm.startsWith("DES")) {
-			throw new CryptoException("Algorithm [{}] is not a DES algorithm!");
+			throw new CryptoException("Algorithm [{}] is not a DES algorithm!", algorithm);
 		}
 
 		SecretKey secretKey;
@@ -190,7 +196,7 @@ public class KeyUtil {
 	 */
 	public static SecretKey generatePBEKey(String algorithm, char[] key) {
 		if (StrUtil.isBlank(algorithm) || false == algorithm.startsWith("PBE")) {
-			throw new CryptoException("Algorithm [{}] is not a PBE algorithm!");
+			throw new CryptoException("Algorithm [{}] is not a PBE algorithm!", algorithm);
 		}
 
 		if (null == key) {
@@ -234,8 +240,8 @@ public class KeyUtil {
 	 * 采用PKCS#8规范，此规范定义了私钥信息语法和加密私钥语法<br>
 	 * 算法见：https://docs.oracle.com/javase/7/docs/technotes/guides/security/StandardNames.html#KeyFactory
 	 *
-	 * @param algorithm 算法
-	 * @param key       密钥，必须为DER编码存储
+	 * @param algorithm 算法，如RSA、EC、SM2等
+	 * @param key       密钥，PKCS#8格式
 	 * @return 私钥 {@link PrivateKey}
 	 */
 	public static PrivateKey generatePrivateKey(String algorithm, byte[] key) {
@@ -249,7 +255,7 @@ public class KeyUtil {
 	 * 生成私钥，仅用于非对称加密<br>
 	 * 算法见：https://docs.oracle.com/javase/7/docs/technotes/guides/security/StandardNames.html#KeyFactory
 	 *
-	 * @param algorithm 算法
+	 * @param algorithm 算法，如RSA、EC、SM2等
 	 * @param keySpec   {@link KeySpec}
 	 * @return 私钥 {@link PrivateKey}
 	 * @since 3.1.1
@@ -340,7 +346,13 @@ public class KeyUtil {
 	 * @return {@link KeyPair}
 	 */
 	public static KeyPair generateKeyPair(String algorithm) {
-		return generateKeyPair(algorithm, DEFAULT_KEY_SIZE);
+		int keySize = DEFAULT_KEY_SIZE;
+		if ("ECIES".equalsIgnoreCase(algorithm)) {
+			// ECIES算法对KEY的长度有要求，此处默认256
+			keySize = 256;
+		}
+
+		return generateKeyPair(algorithm, keySize);
 	}
 
 	/**
@@ -595,6 +607,7 @@ public class KeyUtil {
 	 * @since 4.5.2
 	 */
 	public static String getMainAlgorithm(String algorithm) {
+		Assert.notBlank(algorithm, "Algorithm must be not blank!");
 		final int slashIndex = algorithm.indexOf(CharUtil.SLASH);
 		if (slashIndex > 0) {
 			return algorithm.substring(0, slashIndex);
@@ -611,11 +624,20 @@ public class KeyUtil {
 	 */
 	public static String getAlgorithmAfterWith(String algorithm) {
 		Assert.notNull(algorithm, "algorithm must be not null !");
+
+		if (StrUtil.startWithIgnoreCase(algorithm, "ECIESWith")) {
+			return "EC";
+		}
+
+		algorithm = getMainAlgorithm(algorithm);
 		int indexOfWith = StrUtil.lastIndexOfIgnoreCase(algorithm, "with");
 		if (indexOfWith > 0) {
 			algorithm = StrUtil.subSuf(algorithm, indexOfWith + "with".length());
 		}
-		if ("ECDSA".equalsIgnoreCase(algorithm) || "SM2".equalsIgnoreCase(algorithm)) {
+		if ("ECDSA".equalsIgnoreCase(algorithm)
+				|| "SM2".equalsIgnoreCase(algorithm)
+				|| "ECIES".equalsIgnoreCase(algorithm)
+		) {
 			algorithm = "EC";
 		}
 		return algorithm;
@@ -706,14 +728,28 @@ public class KeyUtil {
 	 * @return {@link KeyStore}
 	 */
 	public static KeyStore readKeyStore(String type, InputStream in, char[] password) {
-		KeyStore keyStore;
+		final KeyStore keyStore = getKeyStore(type);
 		try {
-			keyStore = KeyStore.getInstance(type);
 			keyStore.load(in, password);
 		} catch (Exception e) {
 			throw new CryptoException(e);
 		}
 		return keyStore;
+	}
+
+	/**
+	 * 获取{@link KeyStore}对象
+	 *
+	 * @param type 类型
+	 * @return {@link KeyStore}
+	 */
+	public static KeyStore getKeyStore(final String type) {
+		final Provider provider = GlobalBouncyCastleProvider.INSTANCE.getProvider();
+		try {
+			return null == provider ? KeyStore.getInstance(type) : KeyStore.getInstance(type, provider);
+		} catch (final KeyStoreException e) {
+			throw new CryptoException(e);
+		}
 	}
 
 	/**
@@ -905,5 +941,61 @@ public class KeyUtil {
 	 */
 	public static PublicKey decodeECPoint(byte[] encodeByte, String curveName) {
 		return BCUtil.decodeECPoint(encodeByte, curveName);
+	}
+
+	/**
+	 * 通过RSA私钥生成RSA公钥
+	 *
+	 * @param privateKey RSA私钥
+	 * @return RSA公钥，null表示私钥不被支持
+	 * @since 5.3.6
+	 */
+	public static PublicKey getRSAPublicKey(PrivateKey privateKey) {
+		if (privateKey instanceof RSAPrivateCrtKey) {
+			final RSAPrivateCrtKey privk = (RSAPrivateCrtKey) privateKey;
+			return getRSAPublicKey(privk.getModulus(), privk.getPublicExponent());
+		}
+		return null;
+	}
+
+	/**
+	 * 获得RSA公钥对象
+	 *
+	 * @param modulus        Modulus
+	 * @param publicExponent Public Exponent
+	 * @return 公钥
+	 * @since 5.3.6
+	 */
+	public static PublicKey getRSAPublicKey(String modulus, String publicExponent) {
+		return getRSAPublicKey(
+				new BigInteger(modulus, 16), new BigInteger(publicExponent, 16));
+	}
+
+	/**
+	 * 获得RSA公钥对象
+	 *
+	 * @param modulus        Modulus
+	 * @param publicExponent Public Exponent
+	 * @return 公钥
+	 * @since 5.3.6
+	 */
+	public static PublicKey getRSAPublicKey(BigInteger modulus, BigInteger publicExponent) {
+		final RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(modulus, publicExponent);
+		try {
+			return getKeyFactory("RSA").generatePublic(publicKeySpec);
+		} catch (InvalidKeySpecException e) {
+			throw new CryptoException(e);
+		}
+	}
+
+	/**
+	 * 将密钥编码为Base64格式
+	 *
+	 * @param key 密钥
+	 * @return Base64格式密钥
+	 * @since 5.7.22
+	 */
+	public static String toBase64(Key key) {
+		return Base64.encode(key.getEncoded());
 	}
 }
